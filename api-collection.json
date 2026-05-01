@@ -1,0 +1,41 @@
+{
+  "name": "LoanPilot API",
+  "version": "1.0.0",
+  "requests": [
+    {
+      "name": "Process ID KYC",
+      "method": "POST",
+      "url": "{{SUPABASE_URL}}/functions/v1/process-id-kyc",
+      "headers": [
+        { "key": "Authorization", "value": "Bearer {{SERVICE_ROLE_KEY}}" },
+        { "key": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": "{\n  \"image_url\": \"https://example.com/id_card.jpg\",\n  \"user_id\": \"00000000-0000-0000-0000-000000000002\"\n}"
+      }
+    },
+    {
+      "name": "Calculate Loan Decision",
+      "method": "POST",
+      "url": "{{SUPABASE_URL}}/functions/v1/calculate-loan-decision",
+      "headers": [
+        { "key": "Authorization", "value": "Bearer {{SERVICE_ROLE_KEY}}" },
+        { "key": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": "{\n  \"application_id\": \"a1111111-1111-1111-1111-111111111111\"\n}"
+      }
+    }
+  ],
+  "environments": [
+    {
+      "name": "Local",
+      "variables": [
+        { "name": "SUPABASE_URL", "value": "http://localhost:54321" },
+        { "name": "SERVICE_ROLE_KEY", "value": "YOUR_SERVICE_ROLE_KEY" }
+      ]
+    }
+  ]
+}

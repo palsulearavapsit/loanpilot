@@ -1,0 +1,10 @@
+{
+  "name": "LoanPilot",
+  "short_name": "LoanPilot",
+  "description": "Agentic AI Video Call–Based Loan Onboarding System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#3b82f6",
+  "icons": []
+}

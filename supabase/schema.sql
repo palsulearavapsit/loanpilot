@@ -49,7 +49,8 @@ CREATE TABLE onboarding_sessions (
 -- Verification Logs (Audit Trail & AI Signals)
 CREATE TABLE verification_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  session_id UUID NOT NULL REFERENCES onboarding_sessions(id) ON DELETE CASCADE,
+  application_id UUID NOT NULL REFERENCES loan_applications(id) ON DELETE CASCADE,
+  session_id UUID REFERENCES onboarding_sessions(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL, -- 'FACE_MATCH', 'LIVENESS', 'EMOTION', 'OCR', 'CONSENT'
   status TEXT NOT NULL, -- 'SUCCESS', 'FAILED', 'FLAGGED'
   payload JSONB, -- detailed signals or error messages
@@ -88,11 +89,29 @@ CREATE POLICY "Admins can manage all applications" ON loan_applications FOR ALL 
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
--- Sessions & Logs: Restricted to session owner or admin.
+-- Sessions: Restricted to session owner or admin.
 CREATE POLICY "Applicants can view own sessions" ON onboarding_sessions FOR SELECT USING (
   EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
 );
--- ... (Similar for logs and transcripts)
+CREATE POLICY "Applicants can insert own sessions" ON onboarding_sessions FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
+
+-- Verification Logs: Restricted to session owner or admin.
+CREATE POLICY "Applicants can view own logs" ON verification_logs FOR SELECT USING (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
+CREATE POLICY "Applicants can insert own logs" ON verification_logs FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
+
+-- Interview Transcripts: Restricted to session owner or admin.
+CREATE POLICY "Applicants can view own transcripts" ON interview_transcripts FOR SELECT USING (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
+CREATE POLICY "Applicants can insert own transcripts" ON interview_transcripts FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
 
 -- Function to handle profile creation on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -107,3 +126,19 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- STORAGE POLICIES --
+-- Allow authenticated users to upload to temp-kyc
+INSERT INTO storage.buckets (id, name, public) VALUES ('temp-kyc', 'temp-kyc', true) ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Allow authenticated uploads" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'temp-kyc' AND auth.role() = 'authenticated'
+);
+
+CREATE POLICY "Allow owner select" ON storage.objects FOR SELECT USING (
+  bucket_id = 'temp-kyc' AND auth.role() = 'authenticated'
+);
+
+CREATE POLICY "Allow owner delete" ON storage.objects FOR DELETE USING (
+  bucket_id = 'temp-kyc' AND auth.role() = 'authenticated'
+);

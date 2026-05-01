@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LoanPilot: Agentic AI Loan Onboarding MVP
 
-## Getting Started
+A full-stack production-style MVP for a secure, AI-powered loan onboarding system.
 
-First, run the development server:
+## 🚀 Key Features
+- **Secure KYC**: Automatic ID parsing (Aadhaar/PAN) using Google Vision.
+- **AI-Assisted Video Call**: Real-time liveness, emotion detection, and face verification.
+- **Agentic AI Interview**: Dynamic loan questioning using Gemini 1.5 Pro and Whisper STT.
+- **Decision Engine**: Automated risk scoring (0-100) with explainable reasoning.
+- **PWA Ready**: Installable on mobile with offline fallback support.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🛠 Tech Stack
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Framer Motion, TypeScript.
+- **Backend**: Supabase (Postgres, Auth, Storage, Edge Functions).
+- **AI Models**: 
+  - OCR: Google Vision API
+  - Voice: Whisper (STT) + Google TTS
+  - Reasoning: Gemini 1.5 Pro
+  - Client-side: TensorFlow.js (Face/Liveness/Emotion)
+
+## 📦 Project Structure
+```text
+loanpilot/
+├── src/
+│   ├── app/                # Next.js Routes
+│   ├── components/         # UI Components (Atomic Design)
+│   ├── lib/                # Shared Utilities (Supabase, AI)
+│   └── types/              # Domain Models
+├── supabase/
+│   ├── functions/          # Edge Functions (ID KYC, Decision Engine)
+│   └── schema.sql          # DB Migrations & RLS
+└── public/                 # Static Assets & Manifest
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚦 Local Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Configure Environment**:
+   Copy `.env.example` to `.env.local` and fill in your keys.
 
-## Learn More
+3. **Supabase Setup**:
+   - Create a new Supabase project.
+   - Run the SQL in `supabase/schema.sql` in the SQL Editor.
+   - Seed demo data using `supabase/seed.sql`.
+   - Deploy Edge Functions using Supabase CLI:
+     ```bash
+     supabase functions deploy process-id-kyc
+     supabase functions deploy calculate-loan-decision
+     ```
 
-To learn more about Next.js, take a look at the following resources:
+4. **Testing with Bruno/Postman**:
+   Import `api-collection.json` into Bruno or Postman to test the Edge Functions directly.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+5. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🧪 Testing
+Run the following to execute unit tests for the decision engine:
+```bash
+npm test
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ⚠️ Limitations & Improvements
+- **Face Matching**: Currently uses a mock embedding match; integrate `face-api.js` for production comparison.
+- **Liveness**: Basic challenge/response; upgrade to 3D depth maps or active infra-red for high-security.
+- **Data Privacy**: Raw images are deleted, but ensure GDPR compliance by adding a dedicated user data export endpoint.
