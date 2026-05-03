@@ -8,7 +8,7 @@ ADD COLUMN IF NOT EXISTS recovery_sent_at TIMESTAMP WITH TIME ZONE;
 
 -- Create audit_logs table for Phase 5
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES loan_applications(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
   event_data JSONB,
