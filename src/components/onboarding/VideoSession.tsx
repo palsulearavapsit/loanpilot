@@ -42,15 +42,51 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
   // Mock Liveness & Emotion Analysis loop
   useEffect(() => {
     if (livenessStatus === 'TRACKING') {
+      const ctx = canvasRef.current?.getContext('2d');
+      let frame = 0;
+      
+      const drawMesh = () => {
+        if (!ctx || !canvasRef.current) return;
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        
+        // Draw simulated face mesh points
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+        ctx.lineWidth = 0.5;
+        
+        const centerX = canvasRef.current.width / 2;
+        const centerY = canvasRef.current.height / 2;
+        const radius = 80 + Math.sin(frame * 0.1) * 2;
+
+        for (let i = 0; i < 20; i++) {
+          const angle = (i / 20) * Math.PI * 2;
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius;
+          
+          for (let j = 0; j < 20; j++) {
+            const angle2 = (j / 20) * Math.PI * 2;
+            const x2 = centerX + Math.cos(angle2) * (radius * 0.8);
+            const y2 = centerY + Math.sin(angle2) * (radius * 0.8);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+          }
+        }
+        
+        frame++;
+        if (livenessStatus === 'TRACKING') requestAnimationFrame(drawMesh);
+      };
+      
+      drawMesh();
+
       const interval = setInterval(() => {
         const emotions = ['Confident', 'Neutral', 'Focused', 'Calm'];
         setEmotion(emotions[Math.floor(Math.random() * emotions.length)]);
       }, 2000);
 
-      // AUTO-ADVANCE after 4 seconds of successful tracking
       const timer = setTimeout(() => {
         handleCaptureConsent();
-      }, 4500);
+      }, 6000); // Give more time for the "3D scan"
 
       return () => {
         clearInterval(interval);
@@ -61,10 +97,17 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
   const handleCaptureConsent = () => {
     setLivenessStatus('SUCCESS');
+    
+    // Simulate age estimation and stability
+    const estimatedAge = Math.floor(Math.random() * (45 - 25) + 25);
+    const stabilityScore = 0.95 + (Math.random() * 0.05);
+
     onComplete({
       timestamp: new Date().toISOString(),
       emotion_avg: 'Confident',
       liveness_score: 0.98,
+      estimated_age: estimatedAge,
+      stability_score: stabilityScore,
       consent_recorded: true
     });
   };
@@ -78,6 +121,12 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
           muted 
           playsInline 
           className="w-full h-full object-cover mirror"
+        />
+        <canvas 
+          ref={canvasRef} 
+          width={640} 
+          height={480} 
+          className="absolute inset-0 w-full h-full object-cover mirror pointer-events-none"
         />
         
         {/* HUD Overlay */}

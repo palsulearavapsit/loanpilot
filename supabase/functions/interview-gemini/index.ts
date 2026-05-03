@@ -16,6 +16,20 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     )
 
+    // 0. Fetch latest emotion data for Sentiment-Aware AI
+    const { data: latestLogs } = await supabase
+      .from('verification_logs')
+      .select('payload')
+      .eq('application_id', applicationId)
+      .eq('event_type', 'EMOTION')
+      .order('created_at', { ascending: false })
+      .limit(1)
+    
+    const userEmotion = latestLogs?.[0]?.payload?.emotion || 'Neutral'
+    const toneInstruction = userEmotion === 'Stress' 
+      ? 'The user seems stressed. Be extra empathetic and reassuring.' 
+      : 'Maintain a professional and friendly tone.';
+
     // 1. Prepare Gemini Prompt
     const systemPrompt = `
       You are a professional Loan Officer AI. You are interviewing a customer for a loan.
@@ -25,7 +39,8 @@ serve(async (req) => {
       2. LIVENESS CHALLENGE: In your very first response after the user's initial consent, you MUST ask the user to perform a physical action for verification (e.g., "To verify your presence, please blink your eyes slowly or turn your head to the right.").
       3. PROPENSITY ANALYSIS: Analyze the user's tone, hesitation, and clarity. Internally track their "repayment_propensity" (High, Medium, Low).
       4. CONCISION: Keep responses concise.
-      5. CONCLUSION: When you have enough info (income, purpose, employment, etc.), say "Thank you, I have all the information I need to process your application."
+      5. SENTIMENT ADJUSTMENT: ${toneInstruction}
+      6. CONCLUSION: When you have enough info (income, purpose, employment, etc.), say "Thank you, I have all the information I need to process your application."
 
       CURRENT CONTEXT:
       - Interviewing for Application ID: ${applicationId}
@@ -58,9 +73,16 @@ serve(async (req) => {
 
     // 4. Check if interview is "complete"
     if (aiReply.toLowerCase().includes("all the information i need")) {
+      // Analyze final propensity (Self-ask or based on conversation)
+      const propensity = aiReply.length > 100 ? 'Medium' : 'High'; // Simple heuristic or could do a second pass
+      
       await supabase.from('loan_applications').update({
         status: 'INTERVIEW_COMPLETE',
-        interview_completed_at: new Date().toISOString()
+        interview_completed_at: new Date().toISOString(),
+        decision_rationale: { 
+          repayment_propensity: propensity,
+          last_ai_summary: aiReply.substring(0, 500)
+        }
       }).eq('id', applicationId)
     }
 

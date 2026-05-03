@@ -17,7 +17,8 @@ export function useHeartbeat(sessionId: string | null, currentStep: string, payl
         const { error } = await supabase.rpc('update_session_heartbeat', {
           session_id: sessionId,
           step: currentStep,
-          data: payload
+          data: payload,
+          phone: payload?.phone_number || null
         });
 
         if (error) console.error('Heartbeat update failed:', error);

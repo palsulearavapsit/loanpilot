@@ -51,6 +51,13 @@ export default function RootLayout({
         <main className="pt-24 pb-12 px-4 max-w-7xl mx-auto">
           {children}
         </main>
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        `}} />
       </body>
     </html>
   );

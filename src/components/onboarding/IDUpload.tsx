@@ -73,9 +73,26 @@ export const IDUpload: React.FC<IDUploadProps> = ({ onUpload, isProcessing, erro
         </AnimatePresence>
 
         {isProcessing && (
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-            <span className="text-sm font-semibold">Analyzing ID...</span>
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center overflow-hidden">
+            {/* Live Scan Bar */}
+            <motion.div 
+              initial={{ top: '0%' }}
+              animate={{ top: '100%' }}
+              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+              className="absolute left-0 right-0 h-1 bg-primary/80 shadow-[0_0_15px_rgba(59,130,246,1)] z-10"
+            />
+            
+            {/* Bounding Box Simulation */}
+            <div className="absolute inset-8 border-2 border-primary/40 rounded-lg pointer-events-none">
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-primary" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-primary" />
+              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-primary" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-primary" />
+            </div>
+
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-2 relative z-20" />
+            <span className="text-sm font-semibold relative z-20">Analyzing ID...</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold opacity-50 mt-1 relative z-20">Extracting OCR Data</span>
           </div>
         )}
       </div>

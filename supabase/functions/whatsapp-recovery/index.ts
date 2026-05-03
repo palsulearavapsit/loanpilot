@@ -33,21 +33,31 @@ serve(async (req) => {
       const message = `Hi! We noticed you left your loan application at the ${session.current_step} stage. 
       Resume now to get your approval: https://loanpilot.vercel.app/onboarding?session=${session.id}`
 
-      // In a real scenario, call WhatsApp API:
-      /*
-      await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${WHATSAPP_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phoneNumber,
-          type: "text",
-          text: { body: message }
-        })
-      })
-      */
-      
       console.log(`Sending recovery to ${phoneNumber}: ${message}`)
+
+      // In a real scenario, call WhatsApp API:
+      try {
+        const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_ID}/messages`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${WHATSAPP_API_KEY}`, 
+            'Content-Type': 'application/json' 
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: phoneNumber,
+            type: "text",
+            text: { body: message }
+          })
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error(`WhatsApp API error for ${phoneNumber}:`, errorData)
+        }
+      } catch (err) {
+        console.error(`Failed to send WhatsApp message to ${phoneNumber}:`, err)
+      }
 
       // 3. Mark as sent
       await supabase

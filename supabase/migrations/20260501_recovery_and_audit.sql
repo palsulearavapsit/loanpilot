@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   application_id UUID NOT NULL REFERENCES loan_applications(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
   event_data JSONB,
+  content_hash TEXT, -- SHA-256 hash for immutability
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -38,13 +39,14 @@ END
 $$;
 
 -- Function to update last_active_at
-CREATE OR REPLACE FUNCTION update_session_heartbeat(session_id UUID, step TEXT, data JSONB)
+CREATE OR REPLACE FUNCTION update_session_heartbeat(session_id UUID, step TEXT, data JSONB, phone TEXT DEFAULT NULL)
 RETURNS VOID AS $$
 BEGIN
   UPDATE onboarding_sessions
   SET 
     current_step = step,
     payload = data,
+    phone_number = COALESCE(phone, phone_number),
     last_active_at = CURRENT_TIMESTAMP
   WHERE id = session_id;
 END;
@@ -67,13 +69,14 @@ SELECT cron.schedule('whatsapp-recovery-job', '0 * * * *',
 INSERT INTO storage.buckets (id, name, public) VALUES ('audit-vault', 'audit-vault', false) ON CONFLICT (id) DO NOTHING;
 
 -- RLS for audit-vault
-CREATE POLICY " Users can upload to their application folder\ ON storage.objects 
+CREATE POLICY "Users can upload to their application folder" ON storage.objects 
 FOR INSERT WITH CHECK (
  bucket_id = 'audit-vault' AND (storage.foldername(name))[1] IN (
  SELECT id::text FROM loan_applications WHERE user_id = auth.uid()
  )
 );
 
-CREATE POLICY \Admins can view all audit vault objects\ ON storage.objects 
+CREATE POLICY "Admins can view all audit vault objects" ON storage.objects 
 FOR SELECT USING (
- bucket_id = 'audit-vault' AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+ bucket_id = 'audit-vault' AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);

@@ -47,6 +47,16 @@ serve(async (req) => {
     const livenessFail = logs?.some(l => l.event_type === 'LIVENESS' && l.status === 'FAILED')
     if (livenessFail) authenticityScore -= 25
     
+    // Check for VIDEO_KYC signals (Age, Stability)
+    const videoKycLog = logs?.find(l => l.event_type === 'VIDEO_KYC')
+    if (videoKycLog) {
+      const { estimated_age, stability_score } = videoKycLog.payload || {}
+      // If stability is low, reduce authenticity
+      if (stability_score && stability_score < 0.8) authenticityScore -= 5
+      // Age mismatch logic (Mock: if age > 50, flag as higher risk for this demo)
+      if (estimated_age && estimated_age > 50) authenticityScore -= 5
+    }
+
     const stressLogs = logs?.filter(l => l.event_type === 'EMOTION' && l.payload?.stress_level > 0.8)
     if (stressLogs && stressLogs.length > 5) authenticityScore -= 5
 

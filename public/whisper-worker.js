@@ -9,7 +9,7 @@ class WhisperWorker {
 
     static async getInstance(progress_callback = null) {
         if (this.instance === null) {
-            this.pipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', { progress_callback });
+            this.pipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', { progress_callback });
             this.instance = this;
         }
         return this.pipeline;
