@@ -48,13 +48,32 @@ export default function OnboardingPage() {
   }, []);
 
   const initSession = async (appId: string) => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('onboarding_sessions')
-      .insert({ application_id: appId })
-      .select()
-      .single();
-    if (!error && data) setSessionId(data.id);
+    // If this is a mock application_id (generated when Supabase was unavailable),
+    // it is not a valid UUID and has no matching row in loan_applications (FK).
+    // Inserting it would cause a 400 Bad Request — skip and use a local session ID.
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(appId);
+    if (!isValidUUID || appId.startsWith('mock-')) {
+      setSessionId(`local-${Date.now()}`);
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('onboarding_sessions')
+        .insert({ application_id: appId })
+        .select()
+        .single();
+      if (error) {
+        console.warn('[initSession] Supabase insert failed, using local session ID:', error.message);
+        setSessionId(`local-${Date.now()}`);
+      } else if (data) {
+        setSessionId(data.id);
+      }
+    } catch (err: any) {
+      console.warn('[initSession] Unexpected error, using local session ID:', err.message);
+      setSessionId(`local-${Date.now()}`);
+    }
   };
 
   // ── STEP 1: Doc Validate → OCR ────────────────────────────────────────────
