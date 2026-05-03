@@ -90,7 +90,17 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
     streamRef.current = mediaStream;
     if (videoRef.current) {
       videoRef.current.srcObject = mediaStream;
-      await videoRef.current.play();
+      try {
+        await videoRef.current.play();
+      } catch (playErr: any) {
+        // AbortError is harmless — browser interrupted play() with a new load,
+        // video will resume automatically once the new srcObject is ready
+        if (playErr.name !== 'AbortError') {
+          setCameraError(playErr.message ?? 'Video playback failed');
+          setLivenessState('FAILED');
+          return;
+        }
+      }
     }
     setLivenessState('TRACKING');
     setFaceDetected(true);

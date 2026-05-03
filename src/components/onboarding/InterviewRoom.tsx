@@ -41,19 +41,25 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
     startCamera();
   }, []);
 
+  // Scroll to latest message
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-    
-    // Start VAD monitoring if not processing
-    if (!isProcessing && hasConsent) {
-      const vadCleanup = startVAD();
-      return () => {
-        vadCleanup.then(cleanup => cleanup?.());
-      };
+    // VAD removed — it created a new AudioContext + ScriptProcessor on every
+    // message update, which was the main source of lag in the interview step
+  }, [messages]);
+
+  // Auto-complete after 2 user responses (fast wrap-up)
+  useEffect(() => {
+    const userMessages = messages.filter((m) => m.role === 'USER');
+    if (userMessages.length >= 2 && !isProcessing) {
+      // Small delay so the last AI reply renders before completing
+      const t = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(t);
     }
-  }, [messages, isProcessing, hasConsent]);
+  }, [messages, isProcessing, onComplete]);
+
 
   const startVAD = async () => {
     try {
@@ -379,7 +385,7 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
             <button 
               className="p-4 rounded-2xl gradient-gold text-brand-black hover:shadow-gold transition-all disabled:opacity-50"
               disabled={isProcessing || isRecording}
-              onClick={() => { if (messages.length > 5) onComplete(); }}
+              onClick={() => { if (messages.filter(m => m.role === 'USER').length >= 1) onComplete(); }}
             >
               <Send className="w-5 h-5" />
             </button>
