@@ -107,7 +107,7 @@ export default function OnboardingPage() {
           particleCount: 150,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#3b82f6', '#8b5cf6', '#10b981']
+          colors: ['#EFC86E', '#D4AF37', '#D39B2A']
         });
       }
     } catch (err) {
@@ -157,28 +157,38 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-12">
+    <div className="max-w-7xl mx-auto py-12 px-4 flex flex-col lg:flex-row gap-12 lg:gap-24 items-start">
       <OfflineFallback />
-      <header className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-widest mb-4">
-          <Shield className="w-3 h-3" />
-          Secure Onboarding
+      
+      {/* Left Column: Progress & Info */}
+      <div className="w-full lg:w-1/3 lg:sticky lg:top-32 border-b lg:border-b-0 border-gold-dark/10 pb-8 lg:pb-0">
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card border border-gold-dark/20 text-gold-dark text-xs font-bold uppercase tracking-widest mb-4 shadow-gold">
+            <Shield className="w-3 h-3" />
+            Secure Onboarding
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-brand-black leading-tight">
+            Verify your <br/> identity
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            Follow these professional steps to securely verify your identity and get your loan approved instantly through our Agentic AI system.
+          </p>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-4">
-          Complete your application
-        </h1>
         
-        {/* Progress Bar */}
-        <div className="flex items-center justify-center gap-4 mt-8">
-          <ProgressDot active={step === 'ID_UPLOAD'} completed={['VIDEO_KYC', 'INTERVIEW', 'RESULT'].includes(step)} />
-          <div className="w-12 h-px bg-white/10" />
-          <ProgressDot active={step === 'VIDEO_KYC'} completed={['INTERVIEW', 'RESULT'].includes(step)} />
-          <div className="w-12 h-px bg-white/10" />
-          <ProgressDot active={step === 'INTERVIEW'} completed={step === 'RESULT'} />
-        </div>
-      </header>
+        {/* Vertical Progress Tracker */}
+        <div className="space-y-8 mt-12 relative">
+          {/* Vertical connecting line */}
+          <div className="absolute left-6 top-6 bottom-6 w-px bg-gold-dark/20 z-0 hidden lg:block" />
 
-      <main className="relative min-h-[500px]">
+          <StepIndicator currentStep={step} targetStep="ID_UPLOAD" stepOrder={0} number={1} title="Document Upload" desc="Aadhaar, PAN, or Voter ID" />
+          <StepIndicator currentStep={step} targetStep="VIDEO_KYC" stepOrder={1} number={2} title="Live Face Match" desc="Real-time liveness check" />
+          <StepIndicator currentStep={step} targetStep="INTERVIEW" stepOrder={2} number={3} title="AI Interview" desc="Loan purpose validation" />
+          <StepIndicator currentStep={step} targetStep="RESULT" stepOrder={3} number={4} title="Instant Decision" desc="Get your approved offer" />
+        </div>
+      </div>
+
+      {/* Right Column: Interactive Content */}
+      <main className="w-full lg:w-2/3 relative min-h-[600px] flex items-center justify-center">
         <AnimatePresence mode="wait">
           {step === 'ID_UPLOAD' && (
             <motion.div 
@@ -218,12 +228,15 @@ export default function OnboardingPage() {
               key="result" 
               initial={{ opacity: 0, scale: 0.9 }} 
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center bg-glass border border-white/10 p-12 rounded-3xl"
+              className="text-center bg-white border-2 border-gold/40 p-12 rounded-3xl shadow-gold-lg relative overflow-hidden"
             >
-              <div className="w-20 h-20 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center mx-auto mb-6">
+              {/* Gold top accent */}
+              <div className="absolute top-0 left-0 right-0 h-1 gradient-gold" />
+
+              <div className="w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
-              <h2 className="text-3xl font-bold mb-4">
+              <h2 className="text-3xl font-bold mb-4 text-brand-black">
                 {decisionData?.status === 'APPROVED' ? 'Application Approved!' : 'Application Under Review'}
               </h2>
               <p className="text-muted-foreground mb-8 max-w-md mx-auto">
@@ -238,12 +251,12 @@ export default function OnboardingPage() {
                 <ResultCard label="Bureau Score" value={decisionData?.bureau_score || '720+'} />
               </div>
 
-                <div className="bg-white/5 border border-white/10 p-8 rounded-3xl mb-8">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-6">Customize Your Offer</h3>
+                <div className="bg-card border border-gold-dark/15 p-8 rounded-3xl mb-8">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-gold-dark mb-6">Customize Your Offer</h3>
                   
                   <div className="space-y-8">
                     <div>
-                      <div className="flex justify-between text-sm mb-4">
+                      <div className="flex justify-between text-sm mb-4 text-brand-black">
                         <span>Loan Amount</span>
                         <span className="font-bold">₹{customAmount.toLocaleString()}</span>
                       </div>
@@ -251,12 +264,12 @@ export default function OnboardingPage() {
                         type="range" min="50000" max="500000" step="10000"
                         value={customAmount}
                         onChange={(e) => setCustomAmount(Number(e.target.value))}
-                        className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary"
+                        className="w-full h-1.5 bg-gold/20 rounded-full appearance-none cursor-pointer accent-gold"
                       />
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-sm mb-4">
+                      <div className="flex justify-between text-sm mb-4 text-brand-black">
                         <span>Tenure (Months)</span>
                         <span className="font-bold">{customTenure} Months</span>
                       </div>
@@ -264,39 +277,38 @@ export default function OnboardingPage() {
                         type="range" min="6" max="36" step="6"
                         value={customTenure}
                         onChange={(e) => setCustomTenure(Number(e.target.value))}
-                        className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary"
+                        className="w-full h-1.5 bg-gold/20 rounded-full appearance-none cursor-pointer accent-gold"
                       />
                     </div>
 
-                    <div className="pt-6 border-t border-white/10 flex justify-between items-center">
+                    <div className="pt-6 border-t border-gold-dark/15 flex justify-between items-center">
                       <div className="text-left">
                         <span className="block text-[10px] text-muted-foreground uppercase font-bold">Estimated EMI</span>
-                        <span className="text-2xl font-extrabold text-white">₹{Math.round((customAmount * (1 + (0.12 * customTenure / 12))) / customTenure).toLocaleString()}</span>
+                        <span className="text-2xl font-extrabold gradient-gold-text">₹{Math.round((customAmount * (1 + (0.12 * customTenure / 12))) / customTenure).toLocaleString()}</span>
                       </div>
-                      <button className="px-6 py-3 rounded-xl gradient-primary font-bold text-xs uppercase tracking-widest">
+                      <button className="px-6 py-3 rounded-xl gradient-gold font-bold text-xs uppercase tracking-widest text-brand-black gold-glow transition-all">
                         Apply Now
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button 
                   onClick={handleDownloadCertificate}
-                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 font-bold hover:bg-white/10 transition-all flex items-center gap-2 justify-center"
+                  className="px-8 py-4 rounded-2xl bg-muted border border-gold-dark/15 font-bold hover:bg-card transition-all flex items-center gap-2 justify-center text-brand-black"
                 >
                   Download Certificate
                 </button>
                 <button 
                   onClick={handleGDPRStore}
-                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 font-bold hover:bg-white/10 transition-all flex items-center gap-2 justify-center"
+                  className="px-8 py-4 rounded-2xl bg-muted border border-gold-dark/15 font-bold hover:bg-card transition-all flex items-center gap-2 justify-center text-brand-black"
                 >
                   Privacy Data Export
                 </button>
               </div>
 
-              <button className="px-8 py-4 rounded-2xl gradient-primary font-bold text-white flex items-center gap-3 mx-auto mt-8 hover:shadow-lg transition-all">
+              <button className="px-8 py-4 rounded-2xl gradient-gold font-bold text-brand-black flex items-center gap-3 mx-auto mt-8 shadow-gold hover:shadow-gold-lg transition-all gold-glow">
                 View Dashboard <ArrowRight className="w-5 h-5" />
               </button>
             </motion.div>
@@ -307,15 +319,32 @@ export default function OnboardingPage() {
   );
 }
 
-const ProgressDot = ({ active, completed }: { active: boolean, completed: boolean }) => (
-  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${
-    completed ? 'bg-green-500' : active ? 'bg-primary scale-125 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-white/10'
-  }`} />
-);
+const STEPS = ['ID_UPLOAD', 'VIDEO_KYC', 'INTERVIEW', 'RESULT'];
+
+const StepIndicator = ({ currentStep, targetStep, stepOrder, number, title, desc }: { currentStep: string, targetStep: string, stepOrder: number, number: number, title: string, desc: string }) => {
+  const currentIndex = STEPS.indexOf(currentStep);
+  const isCompleted = currentIndex > stepOrder;
+  const isActive = currentStep === targetStep;
+  const isPending = currentIndex < stepOrder;
+
+  return (
+    <div className={`relative z-10 flex items-start gap-6 transition-all duration-500 ${isPending ? 'opacity-50 grayscale' : 'opacity-100'}`}>
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg border-2 shadow-sm transition-all duration-300
+        ${isCompleted ? 'bg-green-50 text-green-600 border-green-200' : isActive ? 'gradient-gold text-brand-black border-gold shadow-gold' : 'bg-white text-muted-foreground border-gold-dark/20'}
+      `}>
+        {isCompleted ? <CheckCircle className="w-6 h-6" /> : number}
+      </div>
+      <div className="pt-2">
+        <h3 className={`font-bold text-lg mb-1 ${isActive ? 'text-brand-black' : 'text-brand-black/70'}`}>{title}</h3>
+        <p className="text-sm text-muted-foreground">{desc}</p>
+      </div>
+    </div>
+  );
+};
 
 const ResultCard = ({ label, value }: { label: string, value: string }) => (
-  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+  <div className="p-4 rounded-2xl bg-card border border-gold-dark/15">
     <span className="block text-[10px] text-muted-foreground uppercase font-bold mb-1">{label}</span>
-    <span className="text-lg font-bold">{value}</span>
+    <span className="text-lg font-bold text-brand-black">{value}</span>
   </div>
 );

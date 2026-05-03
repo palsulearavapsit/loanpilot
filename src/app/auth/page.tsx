@@ -48,13 +48,16 @@ export default function AuthPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-glass border border-white/10 p-8 rounded-[2.5rem] shadow-2xl"
+        className="bg-white border-2 border-gold/40 p-8 rounded-[2.5rem] shadow-gold-lg relative overflow-hidden"
       >
+        {/* Decorative gold top accent */}
+        <div className="absolute top-0 left-0 right-0 h-1 gradient-gold" />
+
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-            <ShieldCheck className="text-white w-6 h-6" />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm overflow-hidden border border-gold/20 bg-white">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
+          <h1 className="text-3xl font-bold mb-2 text-brand-black">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
           <p className="text-muted-foreground text-sm">
             {isLogin ? 'Sign in to continue your loan application' : 'Start your secure loan onboarding today'}
           </p>
@@ -71,7 +74,7 @@ export default function AuthPage() {
                   type="text" 
                   placeholder="John Doe"
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary/50 transition-all"
+                  className="w-full bg-muted/50 border border-gold-dark/15 rounded-2xl py-4 pl-12 pr-4 text-brand-black focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 transition-all placeholder:text-muted-foreground"
                 />
               </div>
             </div>
@@ -86,7 +89,7 @@ export default function AuthPage() {
                 type="email" 
                 placeholder="name@company.com"
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary/50 transition-all"
+                className="w-full bg-muted/50 border border-gold-dark/15 rounded-2xl py-4 pl-12 pr-4 text-brand-black focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 transition-all placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -100,7 +103,7 @@ export default function AuthPage() {
                 type="password" 
                 placeholder="••••••••"
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary/50 transition-all"
+                className="w-full bg-muted/50 border border-gold-dark/15 rounded-2xl py-4 pl-12 pr-4 text-brand-black focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 transition-all placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -113,7 +116,7 @@ export default function AuthPage() {
 
           <button 
             disabled={isLoading}
-            className="w-full py-4 rounded-2xl gradient-primary font-bold text-white shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            className="w-full py-4 rounded-2xl gradient-gold font-bold text-brand-black shadow-gold hover:shadow-gold-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 gold-glow"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
             {!isLoading && <ArrowRight className="w-5 h-5" />}
@@ -123,7 +126,7 @@ export default function AuthPage() {
         <div className="mt-8 text-center">
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            className="text-sm font-medium text-muted-foreground hover:text-gold-dark transition-colors"
           >
             {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>

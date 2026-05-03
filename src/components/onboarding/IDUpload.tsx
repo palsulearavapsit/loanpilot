@@ -29,9 +29,12 @@ export const IDUpload: React.FC<IDUploadProps> = ({ onUpload, isProcessing, erro
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 rounded-2xl bg-glass border border-white/10 shadow-2xl">
+    <div className="w-full max-w-md mx-auto p-6 rounded-2xl bg-white border-2 border-gold/40 shadow-gold-lg relative overflow-hidden">
+      {/* Gold top accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 gradient-gold" />
+
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold mb-2">Identity Verification</h2>
+        <h2 className="text-2xl font-bold mb-2 text-brand-black">Identity Verification</h2>
         <p className="text-muted-foreground text-sm">
           Please upload a clear photo or PDF of your Aadhaar, PAN, or Voter ID.
         </p>
@@ -40,7 +43,7 @@ export const IDUpload: React.FC<IDUploadProps> = ({ onUpload, isProcessing, erro
       <div 
         onClick={() => !isProcessing && fileInputRef.current?.click()}
         className={`relative aspect-[1.6/1] rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center
-          ${preview ? 'border-primary/50' : 'border-white/10 hover:border-primary/30'}
+          ${preview ? 'border-gold/50' : 'border-gold-dark/20 hover:border-gold/40'}
           ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
@@ -48,8 +51,8 @@ export const IDUpload: React.FC<IDUploadProps> = ({ onUpload, isProcessing, erro
           {preview ? (
             preview === 'PDF_FILE' ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-2">
-                <FileText className="w-16 h-16 text-primary" />
-                <span className="text-xs font-bold">PDF Document Selected</span>
+                <FileText className="w-16 h-16 text-gold" />
+                <span className="text-xs font-bold text-brand-black">PDF Document Selected</span>
               </motion.div>
             ) : (
               <motion.img 
@@ -73,26 +76,26 @@ export const IDUpload: React.FC<IDUploadProps> = ({ onUpload, isProcessing, erro
         </AnimatePresence>
 
         {isProcessing && (
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center overflow-hidden">
             {/* Live Scan Bar */}
             <motion.div 
               initial={{ top: '0%' }}
               animate={{ top: '100%' }}
               transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="absolute left-0 right-0 h-1 bg-primary/80 shadow-[0_0_15px_rgba(59,130,246,1)] z-10"
+              className="absolute left-0 right-0 h-1 bg-gold shadow-[0_0_15px_rgba(212,175,55,0.8)] z-10"
             />
             
             {/* Bounding Box Simulation */}
-            <div className="absolute inset-8 border-2 border-primary/40 rounded-lg pointer-events-none">
-              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-primary" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-primary" />
-              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-primary" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-primary" />
+            <div className="absolute inset-8 border-2 border-gold/40 rounded-lg pointer-events-none">
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-gold" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-gold" />
+              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-gold" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-gold" />
             </div>
 
-            <Loader2 className="w-8 h-8 animate-spin text-primary mb-2 relative z-20" />
-            <span className="text-sm font-semibold relative z-20">Analyzing ID...</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold opacity-50 mt-1 relative z-20">Extracting OCR Data</span>
+            <Loader2 className="w-8 h-8 animate-spin text-gold mb-2 relative z-20" />
+            <span className="text-sm font-semibold text-brand-black relative z-20">Analyzing ID...</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mt-1 relative z-20">Extracting OCR Data</span>
           </div>
         )}
       </div>

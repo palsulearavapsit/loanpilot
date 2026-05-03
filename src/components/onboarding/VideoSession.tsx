@@ -49,8 +49,8 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
         if (!ctx || !canvasRef.current) return;
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         
-        // Draw simulated face mesh points
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+        // Draw simulated face mesh points with gold color
+        ctx.strokeStyle = 'rgba(212, 175, 55, 0.5)';
         ctx.lineWidth = 0.5;
         
         const centerX = canvasRef.current.width / 2;
@@ -86,7 +86,7 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
       const timer = setTimeout(() => {
         handleCaptureConsent();
-      }, 6000); // Give more time for the "3D scan"
+      }, 6000);
 
       return () => {
         clearInterval(interval);
@@ -98,7 +98,6 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
   const handleCaptureConsent = () => {
     setLivenessStatus('SUCCESS');
     
-    // Simulate age estimation and stability
     const estimatedAge = Math.floor(Math.random() * (45 - 25) + 25);
     const stabilityScore = 0.95 + (Math.random() * 0.05);
 
@@ -114,7 +113,7 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="relative w-full max-w-2xl aspect-video rounded-3xl overflow-hidden bg-black border-4 border-white/5 shadow-2xl">
+      <div className="relative w-full max-w-2xl aspect-video rounded-3xl overflow-hidden bg-black border-2 border-gold/40 shadow-gold-lg">
         <video 
           ref={videoRef} 
           autoPlay 
@@ -132,31 +131,31 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
         {/* HUD Overlay */}
         <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start">
-            <div className="bg-glass px-4 py-2 rounded-full flex items-center gap-2">
+            <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 border border-white/20">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-widest">Live Session</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-white">Live Session</span>
             </div>
-            <div className="bg-glass px-4 py-2 rounded-full flex items-center gap-2 text-primary">
-              <Brain className="w-4 h-4" />
-              <span className="text-xs font-bold">{emotion}</span>
+            <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 border border-gold/30">
+              <Brain className="w-4 h-4 text-gold-light" />
+              <span className="text-xs font-bold text-gold-light">{emotion}</span>
             </div>
           </div>
 
           <div className="flex flex-col items-center gap-4">
             <div className="w-64 h-64 border-2 border-white/20 border-dashed rounded-full flex items-center justify-center">
-              <div className="w-48 h-48 border-2 border-primary/40 rounded-full animate-pulse" />
+              <div className="w-48 h-48 border-2 border-gold/40 rounded-full animate-pulse" />
             </div>
-            <p className="text-sm font-medium bg-black/40 backdrop-blur-md px-4 py-2 rounded-lg">
+            <p className="text-sm font-medium bg-black/40 backdrop-blur-md px-4 py-2 rounded-lg text-white">
               Position your face within the circle
             </p>
           </div>
 
           <div className="flex justify-between items-end">
-            <div className="bg-glass p-3 rounded-xl flex items-center gap-3">
-              <Activity className="w-5 h-5 text-accent" />
+            <div className="bg-black/40 backdrop-blur-md p-3 rounded-xl flex items-center gap-3 border border-white/10">
+              <Activity className="w-5 h-5 text-gold-light" />
               <div className="flex flex-col">
-                <span className="text-[10px] text-muted-foreground uppercase">Stability</span>
-                <span className="text-xs font-bold">Optimal</span>
+                <span className="text-[10px] text-white/60 uppercase">Stability</span>
+                <span className="text-xs font-bold text-white">Optimal</span>
               </div>
             </div>
             <ShieldCheck className="w-8 h-8 text-green-500 drop-shadow-lg" />
@@ -164,9 +163,9 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
         </div>
       </div>
 
-      <div className="w-full max-w-md bg-glass border border-white/10 p-6 rounded-2xl">
-        <h3 className="font-bold mb-4 flex items-center gap-2">
-          <Camera className="w-5 h-5 text-primary" />
+      <div className="w-full max-w-md bg-white border-2 border-gold/40 p-6 rounded-2xl shadow-gold">
+        <h3 className="font-bold mb-4 flex items-center gap-2 text-brand-black">
+          <Camera className="w-5 h-5 text-gold" />
           Onboarding Progress
         </h3>
         <div className="space-y-4">
@@ -177,7 +176,7 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
         <button 
           onClick={handleCaptureConsent}
-          className="w-full mt-6 py-4 rounded-xl gradient-primary font-bold text-white shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          className="w-full mt-6 py-4 rounded-xl gradient-gold font-bold text-brand-black shadow-gold hover:shadow-gold-lg hover:scale-[1.02] active:scale-[0.98] transition-all gold-glow"
         >
           Confirm Presence & Start Interview
         </button>
@@ -188,10 +187,10 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
 const Step = ({ label, status }: { label: string, status: 'completed' | 'active' | 'pending' }) => (
   <div className="flex items-center justify-between">
-    <span className={`text-sm ${status === 'pending' ? 'text-muted-foreground' : 'font-medium'}`}>{label}</span>
+    <span className={`text-sm ${status === 'pending' ? 'text-muted-foreground' : 'font-medium text-brand-black'}`}>{label}</span>
     {status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-    {status === 'active' && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
-    {status === 'pending' && <div className="w-4 h-4 rounded-full border-2 border-white/10" />}
+    {status === 'active' && <div className="w-4 h-4 rounded-full border-2 border-gold border-t-transparent animate-spin" />}
+    {status === 'pending' && <div className="w-4 h-4 rounded-full border-2 border-gold/20" />}
   </div>
 );
 

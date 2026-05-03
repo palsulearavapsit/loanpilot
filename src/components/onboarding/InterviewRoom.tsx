@@ -270,8 +270,8 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
       const isAI = msg.role === 'AI';
       const alignment = isAI ? 'justify-start' : 'justify-end';
       const bubble = isAI 
-        ? 'bg-secondary text-secondary-foreground rounded-tl-none' 
-        : 'gradient-primary text-white rounded-tr-none shadow-md';
+        ? 'bg-card text-brand-black rounded-tl-none border border-gold-dark/10' 
+        : 'gradient-gold text-brand-black rounded-tr-none shadow-gold';
       
       return (
         <motion.div
@@ -281,9 +281,9 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
           className={`flex ${alignment}`}
         >
           <div className={`max-w-[80%] p-4 rounded-2xl flex gap-3 ${bubble}`}>
-            {isAI && <Bot className="w-5 h-5 mt-1 shrink-0 opacity-50" />}
+            {isAI && <Bot className="w-5 h-5 mt-1 shrink-0 text-gold-dark opacity-70" />}
             <p className="text-sm leading-relaxed">{msg.content}</p>
-            {!isAI && <User className="w-5 h-5 mt-1 shrink-0 opacity-50" />}
+            {!isAI && <User className="w-5 h-5 mt-1 shrink-0 opacity-60" />}
           </div>
         </motion.div>
       );
@@ -291,19 +291,19 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row h-[700px] bg-glass border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
-      <div className="w-full md:w-1/2 relative bg-black border-r border-white/10">
+    <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row h-[700px] bg-white border-2 border-gold/40 rounded-[2.5rem] overflow-hidden shadow-gold-lg">
+      <div className="w-full md:w-1/2 relative bg-black border-r border-gold-dark/15">
         <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover mirror" />
         <div className="absolute inset-0 p-6 flex flex-col justify-between pointer-events-none">
           <div className="flex justify-between items-start">
-            <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+            <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/20">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-white">Live AI Session</span>
             </div>
           </div>
           <div className="flex justify-center">
             <div className="w-32 h-32 border-2 border-white/20 border-dashed rounded-full flex items-center justify-center">
-              <div className="w-24 h-24 border border-primary/40 rounded-full animate-ping" />
+              <div className="w-24 h-24 border border-gold/40 rounded-full animate-ping" />
             </div>
           </div>
           <div className="bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/10">
@@ -318,7 +318,7 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
                   initial={{ opacity: 0.3 }}
                   animate={{ opacity: i < 16 ? 1 : 0.3 }}
                   transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.05 }}
-                  className={`flex-1 ${i < 16 ? 'bg-primary' : 'bg-white/20'} rounded-sm`}
+                  className={`flex-1 ${i < 16 ? 'bg-gold' : 'bg-white/20'} rounded-sm`}
                 />
               ))}
             </div>
@@ -326,14 +326,14 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-white/5">
-        <div className="p-6 border-b border-white/10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-            <Bot className="text-white w-6 h-6" />
+      <div className="flex-1 flex flex-col bg-white">
+        <div className="p-6 border-b border-gold-dark/10 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center">
+            <Bot className="text-brand-black w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-bold text-sm">{language === 'hi' ? 'ऋण अधिकारी AI' : 'Loan Officer AI'}</h3>
-            <span className="text-[10px] text-primary uppercase font-bold tracking-widest">{language === 'hi' ? 'सक्रिय साक्षात्कार' : 'Active Interview'}</span>
+            <h3 className="font-bold text-sm text-brand-black">{language === 'hi' ? 'ऋण अधिकारी AI' : 'Loan Officer AI'}</h3>
+            <span className="text-[10px] text-gold-dark uppercase font-bold tracking-widest">{language === 'hi' ? 'सक्रिय साक्षात्कार' : 'Active Interview'}</span>
           </div>
         </div>
 
@@ -342,30 +342,30 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
             {renderMessages()}
             {isProcessing && (
               <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                <div className="bg-secondary p-4 rounded-2xl rounded-tl-none flex gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0.4s]" />
+                <div className="bg-card p-4 rounded-2xl rounded-tl-none flex gap-2 border border-gold-dark/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gold animate-bounce" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-gold animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-gold animate-bounce [animation-delay:0.4s]" />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="p-6 bg-white/5 border-t border-white/10">
+        <div className="p-6 bg-card/50 border-t border-gold-dark/10">
           <div className="flex items-center gap-4">
             <button 
               onClick={handleSpeechInput}
               disabled={isProcessing}
               className={`flex-1 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all ${
-                isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 hover:bg-white/20 text-foreground'
+                isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-muted hover:bg-gold/10 text-brand-black'
               }`}
             >
               {isRecording ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
               {isRecording ? (language === 'hi' ? 'सुन रहा हूँ...' : 'Listening...') : (language === 'hi' ? 'बोलने के लिए दबाएं' : 'Press to Speak')}
             </button>
             <button 
-              className="p-4 rounded-2xl bg-primary text-white hover:shadow-lg hover:shadow-primary/20 transition-all disabled:opacity-50"
+              className="p-4 rounded-2xl gradient-gold text-brand-black hover:shadow-gold transition-all disabled:opacity-50"
               disabled={isProcessing || isRecording}
               onClick={() => { if (messages.length > 5) onComplete(); }}
             >

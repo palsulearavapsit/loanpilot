@@ -15,60 +15,75 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
 
+  /* 🟡 Brand Gold Palette */
+  --color-gold-light: #EFC86E;
+  --color-gold: #D4AF37;
+  --color-gold-dark: #D39B2A;
+
+  /* ⚫ Brand Blacks & Whites */
+  --color-brand-black: #1A1A1A;
+  --color-brand-white: #FFFFFF;
+
+  /* 📜 Card Colors */
+  --color-card: #FFF7E3;
+  --color-card-border: #D39B2A;
+
+  /* 🔘 Text */
+  --color-primary-text: #1A1A1A;
+  --color-secondary-text: #333333;
+
   --animate-fade-in: fade-in 0.5s ease-out;
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
 }
 
+/* ⚪ LIGHT THEME — Pure White Background */
 :root {
-  --background: #ffffff;
-  --foreground: #020617;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --accent: #8b5cf6;
-  --accent-foreground: #ffffff;
+  --background: #FFFFFF;
+  --foreground: #1A1A1A;
+  --primary: #D4AF37;
+  --primary-foreground: #1A1A1A;
+  --secondary: #FFF7E3;
+  --secondary-foreground: #1A1A1A;
+  --accent: #EFC86E;
+  --accent-foreground: #1A1A1A;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --muted: #f8fafc;
-  --muted-foreground: #64748b;
-  --border: #e2e8f0;
+  --muted: #F5F0E8;
+  --muted-foreground: #8B7355;
+  --border: #E8DCC8;
   --radius: 1rem;
 }
 
-.dark {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --primary: #60a5fa;
-  --primary-foreground: #020617;
-  --secondary: #0f172a;
-  --secondary-foreground: #f8fafc;
-  --accent: #a78bfa;
-  --accent-foreground: #020617;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --border: #1e293b;
-}
-
 body {
-  background-color: var(--background);
+  background-color: #FFFFFF;
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Premium Glass & Gradients */
+/* ── Premium Glass (Light Mode) ── */
 .bg-glass {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.12);
 }
 
+/* 🟡 Gold Brand Gradient (Primary) */
 .gradient-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #EFC86E 0%, #D4AF37 50%, #D39B2A 100%);
+}
+
+.gradient-primary-text {
+  background: linear-gradient(135deg, #EFC86E 0%, #D4AF37 50%, #D39B2A 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -76,7 +91,83 @@ body {
 
 .gradient-surface {
   background: 
-    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-    var(--background);
+    radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(239, 200, 110, 0.06) 0%, transparent 50%),
+    #FFFFFF;
+}
+
+/* 🟡 Gold Glass (Light Mode) */
+.bg-glass-gold {
+  background: rgba(255, 247, 227, 0.5);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.gradient-gold {
+  background: linear-gradient(135deg, #EFC86E 0%, #D4AF37 50%, #D39B2A 100%);
+}
+
+.gradient-gold-text {
+  background: linear-gradient(135deg, #EFC86E 0%, #D4AF37 50%, #D39B2A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.border-gold-accent {
+  border-left: 6px solid #D39B2A;
+}
+
+/* ── Gold Dashed Frame (PPT-style) ── */
+.gold-dashed-frame {
+  border: 2px dashed #D39B2A;
+  border-radius: 1.5rem;
+}
+
+/* ── Gold Top Accent Border ── */
+.gold-top-accent {
+  border-top: 6px solid #D39B2A;
+}
+
+/* ── Gold Shadow ── */
+.shadow-gold {
+  box-shadow: 0 8px 40px rgba(212, 175, 55, 0.12);
+}
+
+.shadow-gold-lg {
+  box-shadow: 0 12px 60px rgba(212, 175, 55, 0.18);
+}
+
+/* ── Gold Button Hover Glow ── */
+.gold-glow:hover {
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+}
+
+/* ── Decorative Corner Shapes ── */
+.corner-decoration::before,
+.corner-decoration::after {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: #EFC86E;
+  opacity: 0.12;
+  border-radius: 0.75rem;
+}
+.corner-decoration::before {
+  top: -10px;
+  left: -10px;
+  transform: rotate(12deg);
+}
+.corner-decoration::after {
+  bottom: -10px;
+  right: -10px;
+  transform: rotate(-12deg);
+}
+
+/* ── Light-mode card surface ── */
+.card-surface {
+  background: #FFFFFF;
+  border: 1px solid #E8DCC8;
+  border-radius: 1.5rem;
 }
