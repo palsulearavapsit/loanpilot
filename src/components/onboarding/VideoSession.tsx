@@ -54,22 +54,46 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
   const startCamera = useCallback(async () => {
     setCameraError(null);
     setLivenessState('STARTING');
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
-        audio: true,
-      });
-      streamRef.current = mediaStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
+
+    // Progressive constraint fallback:
+    // 1) Ideal resolution + audio  2) Any video + audio  3) Video-only (no mic required)
+    const attempts = [
+      { video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: true },
+      { video: { facingMode: { ideal: 'user' } }, audio: true },
+      { video: true, audio: false },
+    ] as const;
+
+    let mediaStream: MediaStream | null = null;
+    let lastErr: any;
+
+    for (const constraints of attempts) {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        break; // success — stop trying
+      } catch (err: any) {
+        lastErr = err;
+        // NotFoundError / OverconstrainedError → try next looser set
+        // NotAllowedError → user denied permission, stop immediately
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') break;
       }
-      setLivenessState('TRACKING');
-      setFaceDetected(true);
-    } catch (err: any) {
-      setCameraError(err.message ?? 'Camera access denied');
-      setLivenessState('FAILED');
     }
+
+    if (!mediaStream) {
+      const msg = lastErr?.name === 'NotAllowedError' || lastErr?.name === 'PermissionDeniedError'
+        ? 'Camera permission denied. Please allow access in browser settings.'
+        : lastErr?.message ?? 'Camera not found. Please check your device.';
+      setCameraError(msg);
+      setLivenessState('FAILED');
+      return;
+    }
+
+    streamRef.current = mediaStream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      await videoRef.current.play();
+    }
+    setLivenessState('TRACKING');
+    setFaceDetected(true);
   }, []);
 
   // Acquire geolocation in background
