@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/lib/supabase';
+import dynamic from 'next/dynamic';
+const MapboxMap = dynamic(() => import('@/components/MapboxMap'), { ssr: false });
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('queue');
@@ -365,24 +367,34 @@ export default function AdminDashboard() {
                       value={selectedApp.ocr_dob || selectedApp.decision_rationale?.ocr_dob} />
                   )}
                   {(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location) && (
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => {
-                        const geo = selectedApp.geo_location || selectedApp.decision_rationale?.geo_location;
-                        if (geo?.lat && geo?.lng) {
-                          window.open(`https://maps.google.com/?q=${geo.lat},${geo.lng}`, '_blank');
-                        }
-                      }}
-                    >
-                      <DetailBox icon={<MapPin className="text-gold-dark" />} label="Geolocation"
-                        value={`${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lat?.toFixed(4)}, ${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lng?.toFixed(4)}`}
-                        subValue="Click to open in Google Maps" />
-                    </div>
+                    <DetailBox icon={<MapPin className="text-gold-dark" />} label="Geolocation"
+                      value={`${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lat?.toFixed(4)}°, ${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lng?.toFixed(4)}°`}
+                      subValue="Live location captured during KYC" />
                   )}
                   {selectedApp.decision_rationale?.tenure && (
                     <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.decision_rationale.tenure} Months`} />
                   )}
                 </div>
+
+                {/* Embedded Mapbox — shown when geo exists */}
+                {(() => {
+                  const geo = selectedApp.geo_location || selectedApp.decision_rationale?.geo_location;
+                  if (!geo?.lat || !geo?.lng) return null;
+                  return (
+                    <div className="bg-card/40 border-2 border-gold/20 p-6 rounded-[2rem]">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gold-dark mb-4 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" /> Applicant Location
+                        <a
+                          href={`https://maps.google.com/?q=${geo.lat},${geo.lng}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ml-auto text-[10px] text-muted-foreground hover:text-gold-dark transition-colors"
+                        >Open in Google Maps ↗</a>
+                      </h3>
+                      <MapboxMap lat={geo.lat} lng={geo.lng} height={240} label={selectedApp.profiles?.full_name || selectedApp.ocr_name || 'Applicant'} />
+                    </div>
+                  );
+                })()}
 
                 {/* Document Image */}
                 {selectedAppDocUrl && (

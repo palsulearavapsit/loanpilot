@@ -13,6 +13,8 @@ import { useHeartbeat } from '@/lib/hooks/useHeartbeat';
 import { createClient } from '@/lib/supabase';
 import { Shield, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import dynamic from 'next/dynamic';
+const MapboxMap = dynamic(() => import('@/components/MapboxMap'), { ssr: false });
 
 type Step = 'ID_UPLOAD' | 'VIDEO_KYC' | 'INTERVIEW' | 'RESULT';
 
@@ -29,6 +31,7 @@ export default function OnboardingPage() {
   const [customAmount, setCustomAmount] = useState(100000);
   const [customTenure, setCustomTenure] = useState(12);
   const [showPipeline, setShowPipeline] = useState(false);
+  const [capturedGeo, setCapturedGeo] = useState<{ lat: number; lng: number } | null>(null);
 
   // Validation state (Step 1 gate)
   const [isValidating, setIsValidating] = useState(false);
@@ -133,6 +136,11 @@ export default function OnboardingPage() {
       stability_score: data.stability_score,
       geolocation: data.geolocation,
     });
+
+    // Save geo so we can display the map before the interview step
+    if (data.geolocation) {
+      setCapturedGeo({ lat: data.geolocation.latitude, lng: data.geolocation.longitude });
+    }
 
     setStep('INTERVIEW');
   };
@@ -330,14 +338,33 @@ export default function OnboardingPage() {
 
           {/* STEP 2 — Video KYC */}
           {step === 'VIDEO_KYC' && (
-            <motion.div key="video" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full">
-              <div className="mb-6">
+            <motion.div key="video" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full space-y-6">
+              <div className="mb-2">
                 <h2 className="text-2xl font-bold text-brand-black mb-1">Live Face Verification</h2>
                 <p className="text-sm text-muted-foreground">
                   Face detection, liveness challenge, and geo-location capture. All processed on-device.
                 </p>
               </div>
               <VideoSession applicationId={applicationId ?? ''} onComplete={handleVideoComplete} />
+
+              {/* Geo map — appears once location is captured */}
+              {capturedGeo && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white border-2 border-gold/30 rounded-3xl p-5 shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black uppercase tracking-widest text-gold-dark">
+                      📍 Location Captured
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      {capturedGeo.lat.toFixed(5)}, {capturedGeo.lng.toFixed(5)}
+                    </span>
+                  </div>
+                  <MapboxMap lat={capturedGeo.lat} lng={capturedGeo.lng} height={200} label="Your location" />
+                </motion.div>
+              )}
             </motion.div>
           )}
 
