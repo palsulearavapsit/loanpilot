@@ -491,7 +491,7 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode, label: string
   return (
     <div className="p-8 rounded-[2.5rem] bg-white border border-gold-dark/15 shadow-gold hover:shadow-gold-lg transition-all group relative overflow-hidden">
       <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity pointer-events-none">
-        {React.cloneElement(icon as React.ReactElement, { size: 80 })}
+        <div className="w-20 h-20 [&>*]:w-full [&>*]:h-full">{icon}</div>
       </div>
       <div className="flex items-center justify-between mb-6">
         <div className="p-4 rounded-[1.25rem] bg-card border border-gold-dark/5 group-hover:scale-110 transition-transform text-gold-dark shadow-sm">{icon}</div>
@@ -571,6 +571,4 @@ function LogItem({ event, status, time }: { event: string, status: string, time:
       </div>
     </div>
   );
-}
-
 }
