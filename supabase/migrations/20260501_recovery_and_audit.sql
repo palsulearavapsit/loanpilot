@@ -31,9 +31,7 @@ BEGIN
     
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can view all audit logs') THEN
         CREATE POLICY "Admins can view all audit logs" ON audit_logs 
-        FOR SELECT USING (
-          EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-        );
+        FOR SELECT USING (public.is_admin());
     END IF;
 END
 $$;
@@ -78,5 +76,5 @@ FOR INSERT WITH CHECK (
 
 CREATE POLICY "Admins can view all audit vault objects" ON storage.objects 
 FOR SELECT USING (
- bucket_id = 'audit-vault' AND EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+ bucket_id = 'audit-vault' AND public.is_admin()
 );

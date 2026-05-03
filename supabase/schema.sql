@@ -75,19 +75,26 @@ ALTER TABLE onboarding_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verification_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE interview_transcripts ENABLE ROW LEVEL SECURITY;
 
+-- Function to safely check if current user is an admin without recursion
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Profiles: Users can read/write their own profile; admins can read all.
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-);
+CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT USING (public.is_admin());
 
 -- Loan Applications: Applicants can read/write their own; admins all.
 CREATE POLICY "Applicants can view own applications" ON loan_applications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Applicants can insert own applications" ON loan_applications FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Admins can manage all applications" ON loan_applications FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-);
+CREATE POLICY "Admins can manage all applications" ON loan_applications FOR ALL USING (public.is_admin());
 
 -- Sessions: Restricted to session owner or admin.
 CREATE POLICY "Applicants can view own sessions" ON onboarding_sessions FOR SELECT USING (
@@ -96,6 +103,10 @@ CREATE POLICY "Applicants can view own sessions" ON onboarding_sessions FOR SELE
 CREATE POLICY "Applicants can insert own sessions" ON onboarding_sessions FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
 );
+CREATE POLICY "Applicants can update own sessions" ON onboarding_sessions FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
+);
+CREATE POLICY "Admins can manage all sessions" ON onboarding_sessions FOR ALL USING (public.is_admin());
 
 -- Verification Logs: Restricted to session owner or admin.
 CREATE POLICY "Applicants can view own logs" ON verification_logs FOR SELECT USING (
@@ -104,6 +115,7 @@ CREATE POLICY "Applicants can view own logs" ON verification_logs FOR SELECT USI
 CREATE POLICY "Applicants can insert own logs" ON verification_logs FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
 );
+CREATE POLICY "Admins can manage all logs" ON verification_logs FOR ALL USING (public.is_admin());
 
 -- Interview Transcripts: Restricted to session owner or admin.
 CREATE POLICY "Applicants can view own transcripts" ON interview_transcripts FOR SELECT USING (
@@ -112,6 +124,7 @@ CREATE POLICY "Applicants can view own transcripts" ON interview_transcripts FOR
 CREATE POLICY "Applicants can insert own transcripts" ON interview_transcripts FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM loan_applications WHERE id = application_id AND user_id = auth.uid())
 );
+CREATE POLICY "Admins can manage all transcripts" ON interview_transcripts FOR ALL USING (public.is_admin());
 
 -- Function to handle profile creation on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
