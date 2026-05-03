@@ -444,19 +444,28 @@ export function useKYCPipeline() {
         } else {
           finalGeo = { lat: sessionData.geolocation.latitude, lng: sessionData.geolocation.longitude };
         }
-        // Save via server API — bypasses RLS
-        await fetch('/api/kyc/save', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: finalGeo } }),
-        });
+        // Save via server API — bypasses RLS; store in decision_rationale.geo_location
+        try {
+          const geoRes = await fetch('/api/kyc/save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: finalGeo } }),
+          });
+          const geoJson = await geoRes.json();
+          if (!geoRes.ok) console.error('[VIDEO_GEOLOCATION] Save failed:', geoJson.error);
+          else console.log('[VIDEO_GEOLOCATION] Geo saved ✓', finalGeo);
+        } catch (e: any) {
+          console.error('[VIDEO_GEOLOCATION] Fetch error:', e.message);
+        }
         return finalGeo;
       }, {
         fallback: async () => {
           const mockGeo = { lat: 0, lng: 0, note: 'geo_skipped' };
-          await fetch('/api/kyc/save', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: mockGeo } }),
-          });
+          try {
+            await fetch('/api/kyc/save', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: mockGeo } }),
+            });
+          } catch {}
           return mockGeo;
         },
         skipOnFail: false,
@@ -541,14 +550,19 @@ export function useKYCPipeline() {
         },
       });
 
+      // Compute final decision BEFORE STORE_LOGS uses it
+      const finalDecision: PipelineOutput['final_decision'] =
+        decisionResult.ok
+          ? (decisionResult.data?.status as PipelineOutput['final_decision']) ?? 'UNDER_REVIEW'
+          : 'UNDER_REVIEW';
+
       // STORE_LOGS — update final status + risk_score on the row
       await runStep('STORE_LOGS', async () => {
         const score = decisionResult.data?.score ?? 50;
-        const statusMap: Record<string, string> = { APPROVED: 'APPROVED', REJECTED: 'REJECTED', UNDER_REVIEW: 'UNDER_REVIEW' };
         await fetch('/api/kyc/save', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'update', application_id: applicationId, fields: {
-            status: statusMap[finalDecision] ?? 'UNDER_REVIEW',
+            status: finalDecision,
             risk_score: score,
             interview_completed_at: new Date().toISOString(),
           }}),
@@ -556,12 +570,7 @@ export function useKYCPipeline() {
         return { logged: true };
       }, { skipOnFail: true });
 
-      // LOAN_DECISION
-      const finalDecision: PipelineOutput['final_decision'] =
-        decisionResult.ok
-          ? (decisionResult.data?.status as PipelineOutput['final_decision']) ?? 'UNDER_REVIEW'
-          : 'UNDER_REVIEW';
-
+      // LOAN_DECISION — record the final outcome step
       await runStep('LOAN_DECISION', async () => {
         return { decision: finalDecision, score: decisionResult.data?.score };
       });
