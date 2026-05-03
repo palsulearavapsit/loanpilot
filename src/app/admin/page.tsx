@@ -265,12 +265,9 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <div className="font-bold text-brand-black flex items-center gap-2">
-                              {app.profiles?.full_name || app.decision_rationale?.ocr_name || 'Anonymous'}
-                              {app.source === 'local_pipeline' && (
-                                <span className="text-[9px] bg-amber-500/15 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Local</span>
-                              )}
+                              {app.profiles?.full_name || app.ocr_name || app.decision_rationale?.ocr_name || 'Anonymous'}
                             </div>
-                            <div className="text-[10px] text-muted-foreground font-mono truncate w-24">{app.id}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono truncate w-36">{app.id}</div>
                           </div>
                         </div>
                       </td>
@@ -349,11 +346,11 @@ export default function AdminDashboard() {
                 {/* Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <DetailBox icon={<Users />} label="Applicant Name"
-                    value={selectedApp.profiles?.full_name || selectedApp.decision_rationale?.ocr_name || 'Not extracted'}
+                    value={selectedApp.profiles?.full_name || selectedApp.ocr_name || selectedApp.decision_rationale?.ocr_name || 'Not extracted'}
                     subValue={selectedApp.profiles?.email} />
                   <DetailBox icon={<FileText />} label="Principal Amount"
                     value={selectedApp.amount ? `₹${selectedApp.amount.toLocaleString()}` : 'Pending offer'}
-                    subValue={selectedApp.purpose || 'Capital Expenditure'} />
+                    subValue={selectedApp.purpose || 'Personal Loan'} />
                   <DetailBox
                     icon={<AlertTriangle className={selectedApp.risk_score > 50 ? 'text-red-500' : 'text-gold-dark'} />}
                     label="Risk Classification"
@@ -363,12 +360,27 @@ export default function AdminDashboard() {
                   <DetailBox icon={<FileText />} label="Document Type"
                     value={selectedApp.id_type || selectedApp.decision_rationale?.doc_type || 'Not recorded'}
                     subValue={selectedApp.id_number_last4 ? `Ends in: •••• ${selectedApp.id_number_last4}` : undefined} />
-                  {selectedApp.decision_rationale?.ocr_dob && (
+                  {(selectedApp.ocr_dob || selectedApp.decision_rationale?.ocr_dob) && (
                     <DetailBox icon={<Clock />} label="Date of Birth"
-                      value={selectedApp.decision_rationale.ocr_dob} />
+                      value={selectedApp.ocr_dob || selectedApp.decision_rationale?.ocr_dob} />
                   )}
-                  {selectedApp.tenure && (
-                    <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.tenure} Months`} />
+                  {(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location) && (
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const geo = selectedApp.geo_location || selectedApp.decision_rationale?.geo_location;
+                        if (geo?.lat && geo?.lng) {
+                          window.open(`https://maps.google.com/?q=${geo.lat},${geo.lng}`, '_blank');
+                        }
+                      }}
+                    >
+                      <DetailBox icon={<MapPin className="text-gold-dark" />} label="Geolocation"
+                        value={`${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lat?.toFixed(4)}, ${(selectedApp.geo_location || selectedApp.decision_rationale?.geo_location)?.lng?.toFixed(4)}`}
+                        subValue="Click to open in Google Maps" />
+                    </div>
+                  )}
+                  {selectedApp.decision_rationale?.tenure && (
+                    <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.decision_rationale.tenure} Months`} />
                   )}
                 </div>
 

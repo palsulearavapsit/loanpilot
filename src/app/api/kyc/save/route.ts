@@ -1,109 +1,154 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Service-role client — bypasses RLS, runs server-side only
-const adminSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Pure service-role admin client — server-side only, bypasses all RLS
+function getAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Missing Supabase env vars');
+  return createClient(url, key, { auth: { persistSession: false } });
+}
 
 export async function POST(req: NextRequest) {
+  let body: any;
   try {
-    const body = await req.json();
-    const { action, ...payload } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-    // ── CREATE: initial loan_applications row ──────────────────────────────
+  const { action, ...payload } = body;
+  const db = getAdmin();
+
+  try {
+    // ── CREATE ────────────────────────────────────────────────────────────────
     if (action === 'create') {
       const { user_id, docType, ocrData } = payload;
+      if (!user_id) return NextResponse.json({ error: 'Missing user_id' }, { status: 400 });
 
-      // Create loan_applications row
-      const { data: appRow, error: appErr } = await adminSupabase
+      const { data: appRow, error: appErr } = await db
         .from('loan_applications')
         .insert({
           user_id,
           status: 'PENDING',
           purpose: 'Personal Loan',
-          id_type: docType,
+          id_type: docType ?? null,
           id_number_last4: ocrData?.id_number ? String(ocrData.id_number).slice(-4) : null,
           decision_rationale: {
             ocr_name: ocrData?.name ?? null,
             ocr_dob: ocrData?.dob ?? null,
-            doc_type: docType,
+            doc_type: docType ?? null,
             ocr_source: 'gemini_vision',
           },
         })
         .select('id')
         .single();
 
-      if (appErr || !appRow?.id) {
-        return NextResponse.json({ error: appErr?.message ?? 'Failed to create row' }, { status: 500 });
+      if (appErr) {
+        console.error('[/api/kyc/save create] DB error:', appErr);
+        return NextResponse.json({ error: appErr.message }, { status: 500 });
       }
 
-      // Update profile name from OCR if not already set
+      // Update profile name from OCR only if not already set
       if (ocrData?.name) {
-        const { data: profile } = await adminSupabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user_id)
-          .single();
+        const { data: profile } = await db.from('profiles').select('full_name').eq('id', user_id).single();
         if (!profile?.full_name) {
-          await adminSupabase.from('profiles').update({ full_name: ocrData.name }).eq('id', user_id);
+          await db.from('profiles').update({ full_name: ocrData.name }).eq('id', user_id);
         }
       }
 
       return NextResponse.json({ application_id: appRow.id });
     }
 
-    // ── UPDATE: patch fields on an existing row ────────────────────────────
+    // ── UPDATE ────────────────────────────────────────────────────────────────
+    // Stores all fields in decision_rationale JSONB so no extra columns needed.
+    // Known schema columns are also updated directly where they exist.
     if (action === 'update') {
       const { application_id, fields } = payload;
-      if (!application_id || !fields) {
-        return NextResponse.json({ error: 'Missing application_id or fields' }, { status: 400 });
-      }
-      const { error } = await adminSupabase
-        .from('loan_applications')
-        .update({ ...fields, updated_at: new Date().toISOString() })
-        .eq('id', application_id);
+      if (!application_id || !fields) return NextResponse.json({ error: 'Missing params' }, { status: 400 });
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      // Columns that exist in the schema
+      const schemaColumns = ['status', 'amount', 'risk_score', 'id_type', 'id_number_last4',
+        'interview_completed_at', 'id_verified_at', 'purpose', 'monthly_income', 'employment_type'];
+
+      const directUpdate: any = { updated_at: new Date().toISOString() };
+      const rationale: any = {};
+
+      for (const [key, val] of Object.entries(fields)) {
+        if (schemaColumns.includes(key)) {
+          directUpdate[key] = val;
+        } else {
+          // geo_location, image_path, tenure, etc → store in decision_rationale
+          rationale[key] = val;
+        }
+      }
+
+      // Fetch current decision_rationale to merge into
+      if (Object.keys(rationale).length > 0) {
+        const { data: existing } = await db
+          .from('loan_applications')
+          .select('decision_rationale')
+          .eq('id', application_id)
+          .single();
+        directUpdate.decision_rationale = { ...(existing?.decision_rationale ?? {}), ...rationale };
+      }
+
+      const { error } = await db.from('loan_applications').update(directUpdate).eq('id', application_id);
+      if (error) {
+        console.error('[/api/kyc/save update] DB error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
       return NextResponse.json({ ok: true });
     }
 
-    // ── LOG: insert a verification_log row ─────────────────────────────────
+    // ── LOG ───────────────────────────────────────────────────────────────────
     if (action === 'log') {
       const { application_id, event_type, status, payload: logPayload } = payload;
-      const { error } = await adminSupabase.from('verification_logs').insert({
+      if (!application_id) return NextResponse.json({ error: 'Missing application_id' }, { status: 400 });
+      const { error } = await db.from('verification_logs').insert({
         application_id,
         event_type,
         status,
-        payload: logPayload,
+        payload: logPayload ?? {},
       });
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error('[/api/kyc/save log] DB error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
       return NextResponse.json({ ok: true });
     }
 
-    // ── UPLOAD_IMAGE: upload ID image to storage ───────────────────────────
+    // ── UPLOAD_IMAGE ──────────────────────────────────────────────────────────
     if (action === 'upload_image') {
       const { application_id, user_id, file_base64, file_type, file_name } = payload;
+      if (!file_base64) return NextResponse.json({ error: 'Missing file_base64' }, { status: 400 });
+
       const fileName = `${user_id}/${application_id}/${Date.now()}-${file_name}`;
       const buffer = Buffer.from(file_base64, 'base64');
 
-      const { data: uploadData, error: uploadErr } = await adminSupabase.storage
+      const { data: uploadData, error: uploadErr } = await db.storage
         .from('temp-kyc')
-        .upload(fileName, buffer, { contentType: file_type, upsert: true });
+        .upload(fileName, buffer, { contentType: file_type ?? 'image/jpeg', upsert: true });
 
-      if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 500 });
+      if (uploadErr) {
+        console.error('[/api/kyc/save upload] Storage error:', uploadErr);
+        return NextResponse.json({ error: uploadErr.message }, { status: 500 });
+      }
 
-      // Save image_path to loan_applications
-      await adminSupabase.from('loan_applications')
-        .update({ image_path: uploadData.path, updated_at: new Date().toISOString() })
-        .eq('id', application_id);
+      // Store image_path inside decision_rationale (no extra column needed)
+      const { data: existing } = await db.from('loan_applications').select('decision_rationale').eq('id', application_id).single();
+      await db.from('loan_applications').update({
+        decision_rationale: { ...(existing?.decision_rationale ?? {}), image_path: uploadData.path },
+        updated_at: new Date().toISOString(),
+      }).eq('id', application_id);
 
       return NextResponse.json({ image_path: uploadData.path });
     }
 
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[/api/kyc/save] Unexpected error:', err);
+    return NextResponse.json({ error: err?.message ?? 'Internal server error' }, { status: 500 });
   }
 }
