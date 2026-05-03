@@ -143,15 +143,38 @@ export default function OnboardingPage() {
 
     const decision = await pipeline.runInterviewAndDecision(applicationId);
 
-    // Also fetch full decision data for the result card
+    // Fetch full decision data for the result card (edge fn or local fallback)
+    let score = 72;
     try {
       const supabase = createClient();
       const { data } = await supabase.functions.invoke('calculate-loan-decision', {
         body: { application_id: applicationId },
       });
-      setDecisionData(data);
+      if (data?.score) score = data.score;
+      setDecisionData(data ?? { status: decision, score });
     } catch {
-      setDecisionData({ status: decision, score: 72 });
+      setDecisionData({ status: decision, score });
+    }
+
+    // ── Persist final decision + risk_score to DB ─────────────────────────
+    // Only update real rows (mock IDs are not valid UUIDs and have no DB row)
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId);
+    if (isValidUUID) {
+      try {
+        const supabase = createClient();
+        const statusMap: Record<string, string> = {
+          APPROVED: 'APPROVED',
+          REJECTED: 'REJECTED',
+          UNDER_REVIEW: 'UNDER_REVIEW',
+        };
+        await supabase.from('loan_applications').update({
+          status: statusMap[decision] ?? 'UNDER_REVIEW',
+          risk_score: score,
+          updated_at: new Date().toISOString(),
+        }).eq('id', applicationId);
+      } catch (e) {
+        console.warn('[handleInterviewComplete] Could not update loan_applications:', e);
+      }
     }
 
     setStep('RESULT');
@@ -247,6 +270,15 @@ export default function OnboardingPage() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             AI-powered KYC with 13-step verification pipeline including liveness, emotion tracking, and credit scoring.
           </p>
+          {/* Start New Application — resets all state for a fresh run */}
+          {step !== 'ID_UPLOAD' && (
+            <button
+              onClick={handleStartOver}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gold-dark/30 text-xs font-bold text-gold-dark hover:bg-gold/10 transition-all"
+            >
+              <ArrowRight className="w-3.5 h-3.5 rotate-180" /> Start New Application
+            </button>
+          )}
         </div>
 
         {/* Step tracker */}
@@ -406,7 +438,19 @@ export default function OnboardingPage() {
                         ₹{Math.round((customAmount * (1 + (0.12 * customTenure / 12))) / customTenure).toLocaleString()}
                       </span>
                     </div>
-                    <button onClick={() => {
+                    <button onClick={async () => {
+                        // Persist chosen amount + tenure to DB for real rows
+                        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId ?? '');
+                        if (isValidUUID && applicationId) {
+                          try {
+                            const supabase = createClient();
+                            await supabase.from('loan_applications').update({
+                              amount: customAmount,
+                              updated_at: new Date().toISOString(),
+                            }).eq('id', applicationId);
+                          } catch (e) { console.warn('Could not save amount to DB:', e); }
+                        }
+                        // Also store in localStorage for local/mock entries
                         const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
                         const entry = {
                           id: applicationId || `local-${Date.now()}`,
