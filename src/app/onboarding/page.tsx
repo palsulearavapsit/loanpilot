@@ -129,6 +129,12 @@ export default function OnboardingPage() {
   const handleVideoComplete = async (data: VideoSessionData) => {
     if (!applicationId) return;
 
+    // Set geo FIRST — renders the map while runVideoKYC is still processing
+    // (step is still VIDEO_KYC during the await below)
+    if (data.geolocation) {
+      setCapturedGeo({ lat: data.geolocation.latitude, lng: data.geolocation.longitude });
+    }
+
     await pipeline.runVideoKYC(applicationId, {
       emotion_avg: data.emotion_avg,
       liveness_score: data.liveness_score,
@@ -136,11 +142,6 @@ export default function OnboardingPage() {
       stability_score: data.stability_score,
       geolocation: data.geolocation,
     });
-
-    // Save geo so we can display the map before the interview step
-    if (data.geolocation) {
-      setCapturedGeo({ lat: data.geolocation.latitude, lng: data.geolocation.longitude });
-    }
 
     setStep('INTERVIEW');
   };
@@ -370,13 +371,29 @@ export default function OnboardingPage() {
 
           {/* STEP 3 — AI Interview */}
           {step === 'INTERVIEW' && (
-            <motion.div key="interview" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full">
-              <div className="mb-6">
+            <motion.div key="interview" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full space-y-5">
+              <div className="mb-2">
                 <h2 className="text-2xl font-bold text-brand-black mb-1">AI Interview</h2>
                 <p className="text-sm text-muted-foreground">
                   Answer a few questions about your loan purpose. AI tracks emotion and confidence in real time.
                 </p>
               </div>
+
+              {/* Geo map — persists from VIDEO_KYC step */}
+              {capturedGeo && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white border-2 border-gold/30 rounded-3xl p-4 shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black uppercase tracking-widest text-gold-dark">📍 Location Verified</span>
+                    <span className="text-[11px] text-muted-foreground font-mono">{capturedGeo.lat.toFixed(5)}, {capturedGeo.lng.toFixed(5)}</span>
+                  </div>
+                  <MapboxMap lat={capturedGeo.lat} lng={capturedGeo.lng} height={160} label="KYC Location" />
+                </motion.div>
+              )}
+
               <InterviewRoom
                 applicationId={applicationId!}
                 sessionId={sessionId!}
@@ -475,6 +492,17 @@ export default function OnboardingPage() {
                   Privacy Export (GDPR)
                 </button>
               </div>
+
+              {/* Geo map on result — confirmed location */}
+              {capturedGeo && (
+                <div className="mt-4 border-t border-gold-dark/10 pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black uppercase tracking-widest text-gold-dark">📍 Location Captured During KYC</span>
+                    <span className="text-[11px] text-muted-foreground font-mono">{capturedGeo.lat.toFixed(5)}, {capturedGeo.lng.toFixed(5)}</span>
+                  </div>
+                  <MapboxMap lat={capturedGeo.lat} lng={capturedGeo.lng} height={180} label="Verified KYC Location" />
+                </div>
+              )}
 
               <button onClick={() => {
                   const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');

@@ -31,6 +31,7 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef<number>(0);
   const animRef = useRef<number | null>(null);
+  const geoRef = useRef<GeolocationCoordinates | null>(null); // always-fresh ref avoids stale closure in handleComplete
 
   const [livenessState, setLivenessState] = useState<LivenessState>('IDLE');
   const [emotion, setEmotion] = useState('Analyzing...');
@@ -106,13 +107,13 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
     setFaceDetected(true);
   }, []);
 
-  // Acquire geolocation in background
+  // Acquire geolocation in background — 5s timeout so it resolves before the 10s auto-complete
   useEffect(() => {
     if (!navigator.geolocation) { setGeoError(true); return; }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setGeolocation(pos.coords),
+      (pos) => { setGeolocation(pos.coords); geoRef.current = pos.coords; },
       () => setGeoError(true),
-      { timeout: 8000 }
+      { timeout: 5000, enableHighAccuracy: true }
     );
   }, []);
 
@@ -208,10 +209,10 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
       });
     }, 2000);
 
-    // Auto-complete after 8s
+    // Auto-complete after 10s — gives geo (5s timeout) time to resolve first
     const completeTimer = setTimeout(() => {
       handleComplete();
-    }, 8000);
+    }, 10000);
 
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -224,6 +225,7 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
 
   const handleComplete = useCallback(() => {
     setLivenessState('SUCCESS');
+    // Use geoRef.current — avoids stale closure (geolocation state may be null even if geo resolved)
     onComplete({
       timestamp: new Date().toISOString(),
       emotion_avg: emotion,
@@ -231,11 +233,11 @@ export const VideoSession: React.FC<VideoSessionProps> = ({ onComplete, applicat
       estimated_age: Math.floor(Math.random() * (45 - 22) + 22),
       stability_score: stabilityScore,
       consent_recorded: true,
-      geolocation,
+      geolocation: geoRef.current,
       face_detected: faceDetected,
       blink_count: blinkCount,
     });
-  }, [emotion, livenessScore, stabilityScore, geolocation, faceDetected, blinkCount, onComplete]);
+  }, [emotion, livenessScore, stabilityScore, faceDetected, blinkCount, onComplete]);
 
   const handleRetry = () => {
     setRetryCount((p) => p + 1);
