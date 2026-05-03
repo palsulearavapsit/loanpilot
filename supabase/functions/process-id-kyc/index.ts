@@ -1,14 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-const GOOGLE_VISION_API_KEY = Deno.env.get("GOOGLE_VISION_API_KEY")
+import { corsHeaders } from "../_shared/cors.ts"
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { image_url, user_id } = await req.json()
 
     if (!image_url || !user_id) {
-      return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400 })
+      return new Response(JSON.stringify({ error: "Missing parameters" }), { 
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     // 1. Fetch image from Supabase Storage
@@ -35,7 +42,7 @@ serve(async (req) => {
     }
 
     if (GEMINI_API_KEY) {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -79,8 +86,9 @@ serve(async (req) => {
       .select()
       .single()
 
+    if (appError) throw appError
+
     // 4. Immediately delete raw ID image
-    // (Assuming image was in a 'temp-kyc' bucket)
     const fileName = image_url.split('/').pop()
     await supabase.storage.from('temp-kyc').remove([fileName])
 
@@ -89,10 +97,14 @@ serve(async (req) => {
       application_id: application.id,
       age_mismatch: ageMismatch 
     }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 })
+    return new Response(JSON.stringify({ error: err.message }), { 
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
   }
 })
+

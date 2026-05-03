@@ -98,6 +98,10 @@ export function useKYCPipeline() {
       docType: 'AADHAAR' | 'PAN',
       geminiKey: string
     ): Promise<{ valid: boolean; reason?: string; ocrRaw?: string }> => {
+      if (!geminiKey) {
+        throw new Error('Gemini API key is missing. Please set NEXT_PUBLIC_GEMINI_API_KEY in .env.local');
+      }
+
       const toBase64 = (f: File): Promise<string> =>
         new Promise((res, rej) => {
           const r = new FileReader();
@@ -120,7 +124,7 @@ export function useKYCPipeline() {
              Valid PAN MUST contain a 10-character alphanumeric code matching ABCDE1234F format AND text "Income Tax Department".`;
 
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -138,7 +142,15 @@ export function useKYCPipeline() {
         }
       );
 
-      if (!resp.ok) throw new Error(`Gemini API error: ${resp.status}`);
+      if (!resp.ok) {
+        if (resp.status === 403) {
+          throw new Error('Gemini API Error 403: Forbidden. Your API key might be invalid, restricted, or your region is not supported.');
+        }
+        if (resp.status === 404) {
+          throw new Error('Gemini API Error 404: Not Found. Switching to Flash model (v1) should resolve this.');
+        }
+        throw new Error(`Gemini API error: ${resp.status}`);
+      }
       const result = await resp.json();
       const text: string =
         result.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
@@ -149,10 +161,10 @@ export function useKYCPipeline() {
 
       if (docType === 'AADHAAR') {
         const valid = parsed.has_12_digit_number === true && parsed.has_govt_of_india === true;
-        return { valid, reason: parsed.reason, ocrRaw: text };
+        return { valid, reason: parsed.reason || 'Missing required Aadhaar elements', ocrRaw: text };
       } else {
         const valid = parsed.has_pan_format === true && parsed.has_income_tax_dept === true;
-        return { valid, reason: parsed.reason, ocrRaw: text };
+        return { valid, reason: parsed.reason || 'Missing required PAN elements', ocrRaw: text };
       }
     },
     []
@@ -176,22 +188,22 @@ export function useKYCPipeline() {
           return { ok: true, data };
         } catch (err: any) {
           retries++;
+          const errMsg = err.message ?? 'Unknown error';
           if (retries <= MAX_RETRIES) {
-            updateStep(step, { status: 'retrying', retries, error: err.message });
+            updateStep(step, { status: 'retrying', retries, error: errMsg });
             await new Promise((r) => setTimeout(r, 800 * retries));
           } else {
             // Try fallback
             if (opts?.fallback) {
               try {
                 const data = await opts.fallback();
-                updateStep(step, { status: 'success', data, retries, error: `Used fallback: ${err.message}` });
+                updateStep(step, { status: 'success', data, retries, error: `Used fallback: ${errMsg}` });
                 return { ok: true, data };
               } catch (fbErr: any) {
                 appendError(`[${step}] Fallback failed: ${fbErr.message}`);
               }
             }
 
-            const errMsg = err.message ?? 'Unknown error';
             updateStep(step, { status: opts?.skipOnFail ? 'skipped' : 'failed', retries, error: errMsg });
             appendError(`[${step}] ${errMsg}`);
             return { ok: opts?.skipOnFail ?? false };
@@ -230,7 +242,12 @@ export function useKYCPipeline() {
           document_valid: false,
           final_decision: 'REJECTED',
         }));
-        appendError(`Document validation failed: ${result.data?.reason ?? 'Invalid document'}`);
+        
+        const specificError = !result.ok 
+          ? (output.step_status['DOC_VALIDATION'].error || 'Connection error')
+          : (result.data?.reason || 'Invalid document format');
+          
+        appendError(`Document validation failed: ${specificError}`);
         setIsRunning(false);
         return false;
       }
@@ -239,8 +256,9 @@ export function useKYCPipeline() {
       setIsRunning(false);
       return true;
     },
-    [runStep, validateDocument, appendError]
+    [runStep, validateDocument, appendError, output.step_status]
   );
+
 
   const runIDUploadOCR = useCallback(
     async (
