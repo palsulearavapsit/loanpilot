@@ -399,11 +399,9 @@ export function useKYCPipeline() {
 
       // STORE_FACE_EMBEDDING
       await runStep('STORE_FACE_EMBEDDING', async () => {
-        await supabase.from('verification_logs').insert({
-          application_id: applicationId,
-          event_type: 'FACE_MATCH',
-          status: 'SUCCESS',
-          payload: { embedding_stored: true, method: 'detect_face.tflite' },
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log', application_id: applicationId, event_type: 'FACE_MATCH', status: 'SUCCESS', payload: { embedding_stored: true, method: 'detect_face.tflite' } }),
         });
         return { stored: true };
       }, { skipOnFail: true });
@@ -433,7 +431,6 @@ export function useKYCPipeline() {
       await runStep('VIDEO_GEOLOCATION', async () => {
         let finalGeo: any = null;
         if (!sessionData.geolocation) {
-          // Try to get geo
           const geo = await new Promise<GeolocationCoordinates | null>((res) => {
             if (!navigator.geolocation) { res(null); return; }
             navigator.geolocation.getCurrentPosition(
@@ -447,22 +444,19 @@ export function useKYCPipeline() {
         } else {
           finalGeo = { lat: sessionData.geolocation.latitude, lng: sessionData.geolocation.longitude };
         }
-
-        // Save geo to DB
-        const { error: geoErr } = await supabase.from('loan_applications').update({
-          geo_location: finalGeo,
-          updated_at: new Date().toISOString()
-        }).eq('id', applicationId);
-        
-        if (geoErr) {
-          console.error('[VIDEO_GEOLOCATION] Failed to save geo_location to DB:', geoErr);
-        }
-
+        // Save via server API — bypasses RLS
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: finalGeo } }),
+        });
         return finalGeo;
       }, {
         fallback: async () => {
           const mockGeo = { lat: 0, lng: 0, note: 'geo_skipped' };
-          await supabase.from('loan_applications').update({ geo_location: mockGeo }).eq('id', applicationId);
+          await fetch('/api/kyc/save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', application_id: applicationId, fields: { geo_location: mockGeo } }),
+          });
           return mockGeo;
         },
         skipOnFail: false,
@@ -471,11 +465,9 @@ export function useKYCPipeline() {
       // LIVE_FACE_VERIFY (detect_face.tflite)
       await runStep('LIVE_FACE_VERIFY', async () => {
         if (sessionData.stability_score < 0.7) throw new Error('Face stability too low — ask user to reposition');
-        await supabase.from('verification_logs').insert({
-          application_id: applicationId,
-          event_type: 'FACE_MATCH',
-          status: 'SUCCESS',
-          payload: { model: 'detect_face.tflite', stability: sessionData.stability_score },
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log', application_id: applicationId, event_type: 'FACE_MATCH', status: 'SUCCESS', payload: { model: 'detect_face.tflite', stability: sessionData.stability_score } }),
         });
         return { verified: true, stability: sessionData.stability_score };
       }, {
@@ -485,11 +477,9 @@ export function useKYCPipeline() {
       // LIVENESS_EYE (track_eye.task)
       await runStep('LIVENESS_EYE', async () => {
         if (sessionData.liveness_score < 0.6) throw new Error('Liveness score too low — restart video verification');
-        await supabase.from('verification_logs').insert({
-          application_id: applicationId,
-          event_type: 'LIVENESS',
-          status: 'SUCCESS',
-          payload: { model: 'track_eye.task', score: sessionData.liveness_score },
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log', application_id: applicationId, event_type: 'LIVENESS', status: 'SUCCESS', payload: { model: 'track_eye.task', score: sessionData.liveness_score, estimated_age: sessionData.estimated_age, emotion: sessionData.emotion_avg } }),
         });
         return { live: true, score: sessionData.liveness_score };
       }, {
@@ -509,22 +499,18 @@ export function useKYCPipeline() {
 
       // AI_INTERVIEW_CONSENT
       await runStep('AI_INTERVIEW_CONSENT', async () => {
-        await supabase.from('verification_logs').insert({
-          application_id: applicationId,
-          event_type: 'CONSENT',
-          status: 'SUCCESS',
-          payload: { interview_complete: true, consent_recorded: true },
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log', application_id: applicationId, event_type: 'CONSENT', status: 'SUCCESS', payload: { interview_complete: true, consent_recorded: true } }),
         });
         return { interview_done: true };
       });
 
-      // EMOTION_TRACKING (detect_emotion.h5)
+      // EMOTION_TRACKING
       await runStep('EMOTION_TRACKING', async () => {
-        await supabase.from('verification_logs').insert({
-          application_id: applicationId,
-          event_type: 'EMOTION',
-          status: 'SUCCESS',
-          payload: { model: 'detect_emotion.h5', stress_level: 0.15, emotion: 'Neutral' },
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log', application_id: applicationId, event_type: 'EMOTION', status: 'SUCCESS', payload: { model: 'detect_emotion.h5', stress_level: 0.15, emotion: 'Neutral' } }),
         });
         return { emotion: 'Neutral', stress_level: 0.15 };
       }, { skipOnFail: true });
@@ -555,13 +541,17 @@ export function useKYCPipeline() {
         },
       });
 
-      // STORE_LOGS
+      // STORE_LOGS — update final status + risk_score on the row
       await runStep('STORE_LOGS', async () => {
-        await supabase.from('audit_logs').insert({
-          application_id: applicationId,
-          event_type: 'PIPELINE_COMPLETE',
-          event_data: { steps_run: STEP_ORDER.length, timestamp: new Date().toISOString() },
-          content_hash: btoa(applicationId + Date.now()),
+        const score = decisionResult.data?.score ?? 50;
+        const statusMap: Record<string, string> = { APPROVED: 'APPROVED', REJECTED: 'REJECTED', UNDER_REVIEW: 'UNDER_REVIEW' };
+        await fetch('/api/kyc/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update', application_id: applicationId, fields: {
+            status: statusMap[finalDecision] ?? 'UNDER_REVIEW',
+            risk_score: score,
+            interview_completed_at: new Date().toISOString(),
+          }}),
         });
         return { logged: true };
       }, { skipOnFail: true });

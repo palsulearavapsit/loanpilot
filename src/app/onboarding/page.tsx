@@ -142,8 +142,8 @@ export default function OnboardingPage() {
     if (!applicationId) return;
 
     const decision = await pipeline.runInterviewAndDecision(applicationId);
-
-    // Fetch full decision data for the result card (edge fn or local fallback)
+    // STORE_LOGS step in the pipeline already writes status+risk_score to DB
+    // Just fetch the score for the result card display
     let score = 72;
     try {
       const supabase = createClient();
@@ -154,27 +154,6 @@ export default function OnboardingPage() {
       setDecisionData(data ?? { status: decision, score });
     } catch {
       setDecisionData({ status: decision, score });
-    }
-
-    // ── Persist final decision + risk_score to DB ─────────────────────────
-    // Only update real rows (mock IDs are not valid UUIDs and have no DB row)
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId);
-    if (isValidUUID) {
-      try {
-        const supabase = createClient();
-        const statusMap: Record<string, string> = {
-          APPROVED: 'APPROVED',
-          REJECTED: 'REJECTED',
-          UNDER_REVIEW: 'UNDER_REVIEW',
-        };
-        await supabase.from('loan_applications').update({
-          status: statusMap[decision] ?? 'UNDER_REVIEW',
-          risk_score: score,
-          updated_at: new Date().toISOString(),
-        }).eq('id', applicationId);
-      } catch (e) {
-        console.warn('[handleInterviewComplete] Could not update loan_applications:', e);
-      }
     }
 
     setStep('RESULT');
@@ -439,44 +418,17 @@ export default function OnboardingPage() {
                       </span>
                     </div>
                     <button onClick={async () => {
-                        // Persist chosen amount + tenure to DB for real rows
-                        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId ?? '');
-                        if (isValidUUID && applicationId) {
-                          try {
-                            const supabase = createClient();
-                            await supabase.from('loan_applications').update({
-                              amount: customAmount,
-                              updated_at: new Date().toISOString(),
-                            }).eq('id', applicationId);
-                          } catch (e) { console.warn('Could not save amount to DB:', e); }
-                        }
-                        // Also store in localStorage for local/mock entries
-                        const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
-                        const ocrData = pipeline.output.step_status.DOC_VALIDATION?.data as any;
-                        const geoData = pipeline.output.step_status.VIDEO_GEOLOCATION?.data as any;
-                        
-                        const entry = {
-                          id: applicationId || `local-${Date.now()}`,
-                          status: pipeline.output.final_decision || decisionData?.status || 'UNDER_REVIEW',
-                          risk_score: decisionData?.score ?? riskScore,
-                          amount: customAmount,
-                          tenure: customTenure,
-                          purpose: 'Personal Loan',
-                          created_at: new Date().toISOString(),
-                          profiles: { full_name: ocrData?.name || 'Applicant', email: '' },
-                          source: 'local_pipeline',
-                          geo_location: geoData || null,
-                          id_type: pipeline.output.document_type || 'AADHAAR',
-                          id_number_last4: ocrData?.id_number ? String(ocrData.id_number).slice(-4) : null,
-                          decision_rationale: {
-                            ocr_name: ocrData?.name || null,
-                            ocr_dob: ocrData?.dob || null,
-                            doc_type: pipeline.output.document_type || 'AADHAAR',
-                            ocr_source: 'gemini_vision',
-                          }
-                        };
-                        if (!existing.find((e: any) => e.id === entry.id)) {
-                          localStorage.setItem('kyc_completed_applications', JSON.stringify([entry, ...existing]));
+                        // Save amount + tenure to DB via server API
+                        if (applicationId && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(applicationId)) {
+                          await fetch('/api/kyc/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'update',
+                              application_id: applicationId,
+                              fields: { amount: customAmount, tenure: customTenure, status: pipeline.output.final_decision || 'UNDER_REVIEW' },
+                            }),
+                          });
                         }
                         router.push('/admin');
                       }} className="px-5 py-2.5 rounded-xl gradient-gold font-bold text-xs uppercase tracking-widest text-brand-black gold-glow">
