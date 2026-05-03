@@ -283,6 +283,22 @@ export function useKYCPipeline() {
         return false;
       }
 
+      setOutput((prev) => ({ ...prev, document_valid: true }));
+      setIsRunning(false);
+      return true;
+    },
+    [runStep, validateDocument, appendError]
+  );
+
+  const runIDUploadOCR = useCallback(
+    async (
+      file: File,
+      docType: 'AADHAAR' | 'PAN',
+      userId: string
+    ): Promise<string | null> => {
+      setIsRunning(true);
+      const supabase = createClient();
+
       // ── Create a real loan_applications row first ────────────────────────
       // This gives every subsequent write (verification_logs, onboarding_sessions)
       // a valid UUID to reference. Without it, all FK inserts silently fail.
