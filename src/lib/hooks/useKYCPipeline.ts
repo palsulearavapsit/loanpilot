@@ -303,65 +303,59 @@ export function useKYCPipeline() {
       setIsRunning(true);
       const supabase = createClient();
 
-      // ── Create a real loan_applications row first ────────────────────────
-      // This gives every subsequent write (verification_logs, onboarding_sessions)
-      // a valid UUID to reference. Without it, all FK inserts silently fail.
+      // ── Create loan_applications row via server API (bypasses RLS) ─────────
       const ocrData = output.step_status.DOC_VALIDATION?.data as any;
       let applicationId: string;
       try {
-        const { data: appRow, error: appErr } = await supabase
-          .from('loan_applications')
-          .insert({
-            user_id: userId,
-            status: 'PENDING',
-            purpose: 'Personal Loan',
-            id_type: docType,
-            id_number_last4: ocrData?.id_number ? String(ocrData.id_number).slice(-4) : null,
-            decision_rationale: {
-              ocr_name: ocrData?.name ?? null,
-              ocr_dob:  ocrData?.dob  ?? null,
-              doc_type: docType,
-              ocr_source: 'gemini_vision',
-            },
-          })
-          .select('id')
-          .single();
-        if (appErr || !appRow?.id) throw appErr ?? new Error('No row returned');
-        applicationId = appRow.id;
-
-        // Also update the user's profile name from the ID if not already set
-        if (ocrData?.name) {
-          await supabase.from('profiles').update({ full_name: ocrData.name })
-            .eq('id', userId)
-            .is('full_name', null); // only if not already set
-        }
+        const createRes = await fetch('/api/kyc/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create', user_id: userId, docType, ocrData }),
+        });
+        const createJson = await createRes.json();
+        if (!createJson.application_id) throw new Error(createJson.error ?? 'No ID returned');
+        applicationId = createJson.application_id;
         console.log('[ID_UPLOAD_OCR] Created loan_application:', applicationId);
       } catch (dbErr: any) {
-        // Auth / RLS not configured yet — fall back to mock
-        console.warn('[ID_UPLOAD_OCR] Could not create loan_applications row:', dbErr.message);
+        console.warn('[ID_UPLOAD_OCR] Row creation failed:', dbErr.message);
         applicationId = `mock-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       }
 
       const uploadResult = await runStep('ID_UPLOAD_OCR', async () => {
-        const fileName = `${userId}/${applicationId}/${Date.now()}-${file.name}`;
+        const isValidId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(applicationId);
 
-        // Try real upload; on RLS/auth failure use mock path
+        // Convert file to base64 for server-side upload
         let imagePath = '';
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('temp-kyc')
-          .upload(fileName, file);
-        if (uploadError) {
-          console.warn('[ID_UPLOAD_OCR] Storage upload blocked (RLS/auth), using mock path:', uploadError.message);
-        } else {
-          imagePath = uploadData.path;
-          // Store doc metadata on the loan_applications row so admin can read it
-          await supabase.from('loan_applications').update({
-            id_type: docType,
-            updated_at: new Date().toISOString(),
-          }).eq('id', applicationId);
+        if (isValidId) {
+          try {
+            const toBase64 = (f: File): Promise<string> =>
+              new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res((r.result as string).split(',')[1]);
+                r.onerror = rej;
+                r.readAsDataURL(f);
+              });
+            const base64 = await toBase64(file);
+            const uploadRes = await fetch('/api/kyc/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'upload_image',
+                application_id: applicationId,
+                user_id: userId,
+                file_base64: base64,
+                file_type: file.type || 'image/jpeg',
+                file_name: file.name,
+              }),
+            });
+            const uploadJson = await uploadRes.json();
+            if (uploadJson.image_path) imagePath = uploadJson.image_path;
+          } catch (upErr: any) {
+            console.warn('[ID_UPLOAD_OCR] Image upload failed:', upErr.message);
+          }
         }
 
-        // Try edge function; on failure record mock OCR result
+        // Try edge function for advanced OCR; fall back gracefully
         try {
           const { data: kycResult, error: kycError } = await supabase.functions.invoke(
             'process-id-kyc',
@@ -371,7 +365,7 @@ export function useKYCPipeline() {
           if (!kycResult?.application_id) throw new Error('No application_id returned');
           return { ...kycResult, application_id: applicationId, image_path: imagePath };
         } catch (fnErr: any) {
-          console.warn('[ID_UPLOAD_OCR] Edge function failed, using local OCR result:', fnErr.message);
+          console.warn('[ID_UPLOAD_OCR] Edge function skipped, using Gemini OCR result:', fnErr.message);
           return {
             application_id: applicationId,
             doc_type: docType,
@@ -437,6 +431,7 @@ export function useKYCPipeline() {
 
       // VIDEO + GEOLOCATION
       await runStep('VIDEO_GEOLOCATION', async () => {
+        let finalGeo: any = null;
         if (!sessionData.geolocation) {
           // Try to get geo
           const geo = await new Promise<GeolocationCoordinates | null>((res) => {
@@ -448,11 +443,28 @@ export function useKYCPipeline() {
             );
           });
           if (!geo) throw new Error('Geolocation unavailable');
-          return { lat: geo.latitude, lng: geo.longitude };
+          finalGeo = { lat: geo.latitude, lng: geo.longitude };
+        } else {
+          finalGeo = { lat: sessionData.geolocation.latitude, lng: sessionData.geolocation.longitude };
         }
-        return { lat: sessionData.geolocation.latitude, lng: sessionData.geolocation.longitude };
+
+        // Save geo to DB
+        const { error: geoErr } = await supabase.from('loan_applications').update({
+          geo_location: finalGeo,
+          updated_at: new Date().toISOString()
+        }).eq('id', applicationId);
+        
+        if (geoErr) {
+          console.error('[VIDEO_GEOLOCATION] Failed to save geo_location to DB:', geoErr);
+        }
+
+        return finalGeo;
       }, {
-        fallback: async () => ({ lat: 0, lng: 0, note: 'geo_skipped' }),
+        fallback: async () => {
+          const mockGeo = { lat: 0, lng: 0, note: 'geo_skipped' };
+          await supabase.from('loan_applications').update({ geo_location: mockGeo }).eq('id', applicationId);
+          return mockGeo;
+        },
         skipOnFail: false,
       });
 

@@ -452,6 +452,9 @@ export default function OnboardingPage() {
                         }
                         // Also store in localStorage for local/mock entries
                         const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
+                        const ocrData = pipeline.output.step_status.DOC_VALIDATION?.data as any;
+                        const geoData = pipeline.output.step_status.VIDEO_GEOLOCATION?.data as any;
+                        
                         const entry = {
                           id: applicationId || `local-${Date.now()}`,
                           status: pipeline.output.final_decision || decisionData?.status || 'UNDER_REVIEW',
@@ -460,8 +463,17 @@ export default function OnboardingPage() {
                           tenure: customTenure,
                           purpose: 'Personal Loan',
                           created_at: new Date().toISOString(),
-                          profiles: { full_name: 'Applicant', email: '' },
+                          profiles: { full_name: ocrData?.name || 'Applicant', email: '' },
                           source: 'local_pipeline',
+                          geo_location: geoData || null,
+                          id_type: pipeline.output.document_type || 'AADHAAR',
+                          id_number_last4: ocrData?.id_number ? String(ocrData.id_number).slice(-4) : null,
+                          decision_rationale: {
+                            ocr_name: ocrData?.name || null,
+                            ocr_dob: ocrData?.dob || null,
+                            doc_type: pipeline.output.document_type || 'AADHAAR',
+                            ocr_source: 'gemini_vision',
+                          }
                         };
                         if (!existing.find((e: any) => e.id === entry.id)) {
                           localStorage.setItem('kyc_completed_applications', JSON.stringify([entry, ...existing]));
