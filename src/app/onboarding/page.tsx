@@ -139,6 +139,38 @@ export default function OnboardingPage() {
     }
   };
 
+  // ── Retry / Start Over ───────────────────────────────────────────────────
+  const handleStartOver = () => {
+    pipeline.reset();
+    localStorage.removeItem('kyc_done');
+    setStep('ID_UPLOAD');
+    setApplicationId(null);
+    setSessionId(null);
+    setDecisionData(null);
+    setValidationError(undefined);
+    setValidationSuccess(false);
+    setPendingFile(null);
+    setShowPipeline(false);
+  };
+
+  const handleRetryStep = async (stepName: import('@/lib/hooks/useKYCPipeline').PipelineStepName) => {
+    const uploadSteps = ['ID_UPLOAD_OCR', 'FACE_EXTRACT', 'AGE_VALIDATION', 'DELETE_ID', 'STORE_FACE_EMBEDDING'];
+    const videoSteps  = ['VIDEO_GEOLOCATION', 'LIVE_FACE_VERIFY', 'LIVENESS_EYE'];
+    const interviewSteps = ['AI_INTERVIEW_CONSENT', 'EMOTION_TRACKING', 'CREDIT_DECISION', 'STORE_LOGS', 'LOAN_DECISION'];
+
+    if (stepName === 'DOC_VALIDATION' && pendingFile) {
+      await handleDocumentValidated(pendingFile.file, pendingFile.docType);
+    } else if (uploadSteps.includes(stepName) && pendingFile) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await pipeline.runIDUploadOCR(pendingFile.file, pendingFile.docType, user.id);
+    } else if (videoSteps.includes(stepName)) {
+      setStep('VIDEO_KYC');
+    } else if (interviewSteps.includes(stepName) && applicationId) {
+      await pipeline.runInterviewAndDecision(applicationId);
+    }
+  };
+
   // ── Downloads ─────────────────────────────────────────────────────────────
   const handleDownloadCertificate = async () => {
     try {
@@ -217,6 +249,8 @@ export default function OnboardingPage() {
                 activeStep={pipeline.activeStep}
                 stepOrder={pipeline.STEP_ORDER}
                 compact
+                onRetryStep={handleRetryStep}
+                onStartOver={handleStartOver}
               />
             </motion.div>
           )}

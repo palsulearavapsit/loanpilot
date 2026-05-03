@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, Loader2, Clock, AlertTriangle, SkipForward } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Clock, AlertTriangle, SkipForward, RefreshCw, RotateCcw } from 'lucide-react';
 import type { PipelineStepName, StepResult, PipelineOutput } from '@/lib/hooks/useKYCPipeline';
 
 const STEP_LABELS: Record<PipelineStepName, string> = {
@@ -27,6 +27,8 @@ interface PipelineStatusPanelProps {
   activeStep: PipelineStepName | null;
   stepOrder: PipelineStepName[];
   compact?: boolean;
+  onRetryStep?: (step: PipelineStepName) => void;
+  onStartOver?: () => void;
 }
 
 export const PipelineStatusPanel: React.FC<PipelineStatusPanelProps> = ({
@@ -34,6 +36,8 @@ export const PipelineStatusPanel: React.FC<PipelineStatusPanelProps> = ({
   activeStep,
   stepOrder,
   compact = false,
+  onRetryStep,
+  onStartOver,
 }) => {
   const allSteps = stepOrder.map((s) => output.step_status[s]);
   const totalSteps = allSteps.length;
@@ -78,6 +82,7 @@ export const PipelineStatusPanel: React.FC<PipelineStatusPanelProps> = ({
               step={step}
               isActive={isActive}
               index={idx + 1}
+              onRetry={onRetryStep ? () => onRetryStep(stepName) : undefined}
             />
           );
         })}
@@ -103,18 +108,46 @@ export const PipelineStatusPanel: React.FC<PipelineStatusPanelProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Action footer: shown when any step failed */}
+      <AnimatePresence>
+        {failedSteps > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t border-gold/20 bg-amber-50/40 px-5 py-3 flex flex-col gap-2"
+          >
+            <p className="text-[11px] text-amber-700 font-semibold">
+              {failedSteps} step{failedSteps > 1 ? 's' : ''} failed. Retry the failed step or start over.
+            </p>
+            <div className="flex gap-2">
+              {onStartOver && (
+                <button
+                  onClick={onStartOver}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 text-[11px] font-bold hover:bg-red-50 transition-all"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Start from First
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 const StepRow = ({
-  stepName, label, step, isActive, index,
+  stepName, label, step, isActive, index, onRetry,
 }: {
   stepName: PipelineStepName;
   label: string;
   step: StepResult;
   isActive: boolean;
   index: number;
+  onRetry?: () => void;
 }) => {
   const statusIcon = {
     pending:  <Clock className="w-4 h-4 text-muted-foreground/50" />,
@@ -153,6 +186,16 @@ const StepRow = ({
           <span className="text-[10px] text-muted-foreground truncate block">{step.error}</span>
         )}
       </div>
+      {/* Retry button — shown only on failed steps */}
+      {step.status === 'failed' && onRetry && (
+        <button
+          onClick={onRetry}
+          title="Retry this step"
+          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-red-200 text-red-500 text-[10px] font-bold hover:bg-red-50 hover:border-red-400 transition-all"
+        >
+          <RefreshCw className="w-3 h-3" /> Retry
+        </button>
+      )}
       {step.status === 'success' && step.retries > 0 && (
         <span className="text-[9px] text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
           {step.retries}x retry

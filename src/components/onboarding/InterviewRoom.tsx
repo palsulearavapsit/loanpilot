@@ -159,20 +159,32 @@ export const InterviewRoom: React.FC<{ applicationId: string; sessionId: string;
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        
+        // Use the recorder's actual MIME type — not 'audio/wav' which would mismatch
+        // webm/opus (Chrome default) and cause decodeAudioData EncodingError
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
         // If this is consent, upload it
         if (messages.length === 1 && !hasConsent) {
           uploadConsentAudio(audioBlob);
         }
 
-        // Send to Whisper Worker
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        const float32Data = audioBuffer.getChannelData(0);
-        
-        workerRef.current?.postMessage({ audio: float32Data, language });
+        // Send to Whisper Worker — wrap decodeAudioData so an empty/corrupt
+        // recording doesn't throw an unhandled EncodingError rejection
+        try {
+          // Do NOT force sampleRate — the stream's native rate must be used
+          // for decodeAudioData; resampling happens inside the Whisper worker
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          if (arrayBuffer.byteLength === 0) throw new Error('Empty audio buffer');
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const float32Data = audioBuffer.getChannelData(0);
+          workerRef.current?.postMessage({ audio: float32Data, language });
+          await audioContext.close();
+        } catch (decodeErr) {
+          console.warn('[STT] decodeAudioData failed, skipping Whisper:', decodeErr);
+          setIsProcessing(false);
+        }
       };
 
       mediaRecorder.start();
