@@ -99,7 +99,7 @@ export function useKYCPipeline() {
       file: File,
       docType: 'AADHAAR' | 'PAN',
       geminiKey: string
-    ): Promise<{ valid: boolean; reason?: string; ocrRaw?: string }> => {
+    ): Promise<{ valid: boolean; reason?: string; ocrRaw?: string; name?: string; dob?: string; id_number?: string }> => {
       const toBase64 = (f: File): Promise<string> =>
         new Promise((res, rej) => {
           const r = new FileReader();
@@ -116,10 +116,14 @@ export function useKYCPipeline() {
 
       const prompt =
         docType === 'AADHAAR'
-          ? `Analyze this ID card image. Return JSON only: { "valid": true/false, "reason": "...", "has_12_digit_number": true/false, "has_govt_of_india": true/false }.
-             Valid Aadhaar MUST contain a 12-digit number (format XXXX XXXX XXXX) AND the text "Government of India".`
-          : `Analyze this ID card image. Return JSON only: { "valid": true/false, "reason": "...", "has_pan_format": true/false, "has_income_tax_dept": true/false }.
-             Valid PAN MUST contain a 10-character alphanumeric code matching ABCDE1234F format AND text "Income Tax Department".`;
+          ? `Analyze this Aadhaar card image. Return JSON only, no markdown:
+             { "valid": true/false, "reason": "...", "has_12_digit_number": true/false, "has_govt_of_india": true/false,
+               "name": "full name on card or null", "dob": "DD/MM/YYYY or null", "id_number": "last 4 digits only or null" }.
+             Valid Aadhaar MUST contain a 12-digit number AND the text "Government of India".`
+          : `Analyze this PAN card image. Return JSON only, no markdown:
+             { "valid": true/false, "reason": "...", "has_pan_format": true/false, "has_income_tax_dept": true/false,
+               "name": "full name on card or null", "dob": "DD/MM/YYYY or null", "id_number": "PAN number or null" }.
+             Valid PAN MUST contain a 10-character alphanumeric code (ABCDE1234F format) AND "Income Tax Department".`;
 
       // ── Primary: Gemini 2.0 Flash (gemini-1.5-pro is deprecated → 404) ──
       const tryGemini = async (): Promise<string> => {
@@ -197,10 +201,10 @@ export function useKYCPipeline() {
 
       if (docType === 'AADHAAR') {
         const valid = parsed.has_12_digit_number === true && parsed.has_govt_of_india === true;
-        return { valid, reason: parsed.reason, ocrRaw: text };
+        return { valid, reason: parsed.reason, ocrRaw: text, name: parsed.name, dob: parsed.dob, id_number: parsed.id_number };
       } else {
         const valid = parsed.has_pan_format === true && parsed.has_income_tax_dept === true;
-        return { valid, reason: parsed.reason, ocrRaw: text };
+        return { valid, reason: parsed.reason, ocrRaw: text, name: parsed.name, dob: parsed.dob, id_number: parsed.id_number };
       }
     },
     []
@@ -302,6 +306,7 @@ export function useKYCPipeline() {
       // ── Create a real loan_applications row first ────────────────────────
       // This gives every subsequent write (verification_logs, onboarding_sessions)
       // a valid UUID to reference. Without it, all FK inserts silently fail.
+      const ocrData = output.step_status.DOC_VALIDATION?.data as any;
       let applicationId: string;
       try {
         const { data: appRow, error: appErr } = await supabase
@@ -310,11 +315,26 @@ export function useKYCPipeline() {
             user_id: userId,
             status: 'PENDING',
             purpose: 'Personal Loan',
+            id_type: docType,
+            id_number_last4: ocrData?.id_number ? String(ocrData.id_number).slice(-4) : null,
+            decision_rationale: {
+              ocr_name: ocrData?.name ?? null,
+              ocr_dob:  ocrData?.dob  ?? null,
+              doc_type: docType,
+              ocr_source: 'gemini_vision',
+            },
           })
           .select('id')
           .single();
         if (appErr || !appRow?.id) throw appErr ?? new Error('No row returned');
         applicationId = appRow.id;
+
+        // Also update the user's profile name from the ID if not already set
+        if (ocrData?.name) {
+          await supabase.from('profiles').update({ full_name: ocrData.name })
+            .eq('id', userId)
+            .is('full_name', null); // only if not already set
+        }
         console.log('[ID_UPLOAD_OCR] Created loan_application:', applicationId);
       } catch (dbErr: any) {
         // Auth / RLS not configured yet — fall back to mock
@@ -398,7 +418,7 @@ export function useKYCPipeline() {
       setIsRunning(false);
       return applicationId;
     },
-    [runStep]
+    [runStep, output]
   );
 
   const runVideoKYC = useCallback(

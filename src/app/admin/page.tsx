@@ -300,7 +300,7 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <div className="font-bold text-brand-black flex items-center gap-2">
-                              {app.profiles?.full_name || 'Anonymous'}
+                              {app.profiles?.full_name || app.decision_rationale?.ocr_name || 'Anonymous'}
                               {app.source === 'local_pipeline' && (
                                 <span className="text-[9px] bg-amber-500/15 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Local</span>
                               )}
@@ -310,7 +310,9 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="font-black text-brand-black text-sm">₹{app.amount?.toLocaleString()}</div>
+                        <div className="font-black text-brand-black text-sm">
+                          {app.amount ? `₹${app.amount.toLocaleString()}` : <span className="text-muted-foreground">Pending offer</span>}
+                        </div>
                         <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">{app.purpose || 'General Loan'}</div>
                       </td>
                       <td className="px-8 py-6">
@@ -381,16 +383,28 @@ export default function AdminDashboard() {
               <div className="flex-1 overflow-y-auto p-10 space-y-12 scrollbar-hide">
                 {/* Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <DetailBox icon={<Users />} label="Applicant Name" value={selectedApp.profiles?.full_name} subValue={selectedApp.profiles?.email} />
-                  <DetailBox icon={<FileText />} label="Principal Amount" value={`₹${selectedApp.amount?.toLocaleString()}`} subValue={selectedApp.purpose || 'Capital Expenditure'} />
-                  <DetailBox 
-                    icon={<AlertTriangle className={selectedApp.risk_score > 50 ? 'text-red-500' : 'text-gold-dark'} />} 
-                    label="Risk Classification" 
-                    value={`${selectedApp.risk_score || 0}% Severity`} 
-                    subValue={selectedApp.risk_score > 70 ? 'Manual Intervention Mandatory' : 'System Recommendation: Low Risk'} 
+                  <DetailBox icon={<Users />} label="Applicant Name"
+                    value={selectedApp.profiles?.full_name || selectedApp.decision_rationale?.ocr_name || 'Not extracted'}
+                    subValue={selectedApp.profiles?.email} />
+                  <DetailBox icon={<FileText />} label="Principal Amount"
+                    value={selectedApp.amount ? `₹${selectedApp.amount.toLocaleString()}` : 'Pending offer'}
+                    subValue={selectedApp.purpose || 'Capital Expenditure'} />
+                  <DetailBox
+                    icon={<AlertTriangle className={selectedApp.risk_score > 50 ? 'text-red-500' : 'text-gold-dark'} />}
+                    label="Risk Classification"
+                    value={`${selectedApp.risk_score || 0}% Severity`}
+                    subValue={selectedApp.risk_score > 70 ? 'Manual Intervention Mandatory' : 'System Recommendation: Low Risk'}
                   />
-                  <DetailBox icon={<FileText />} label="Document Type" value={selectedApp.id_type || 'Not recorded'} subValue={selectedApp.id_number_last4 ? `Last 4: ${selectedApp.id_number_last4}` : undefined} />
-                  {selectedApp.tenure && <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.tenure} Months`} />}
+                  <DetailBox icon={<FileText />} label="Document Type"
+                    value={selectedApp.id_type || selectedApp.decision_rationale?.doc_type || 'Not recorded'}
+                    subValue={selectedApp.id_number_last4 ? `Ends in: •••• ${selectedApp.id_number_last4}` : undefined} />
+                  {selectedApp.decision_rationale?.ocr_dob && (
+                    <DetailBox icon={<Clock />} label="Date of Birth"
+                      value={selectedApp.decision_rationale.ocr_dob} />
+                  )}
+                  {selectedApp.tenure && (
+                    <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.tenure} Months`} />
+                  )}
                 </div>
 
                 {/* Document Image */}
