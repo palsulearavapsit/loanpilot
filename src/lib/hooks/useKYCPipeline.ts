@@ -283,55 +283,63 @@ export function useKYCPipeline() {
         return false;
       }
 
-      setOutput((prev) => ({ ...prev, document_valid: true }));
-      setIsRunning(false);
-      return true;
-    },
-    [runStep, validateDocument, appendError]
-  );
+      // ── Create a real loan_applications row first ────────────────────────
+      // This gives every subsequent write (verification_logs, onboarding_sessions)
+      // a valid UUID to reference. Without it, all FK inserts silently fail.
+      let applicationId: string;
+      try {
+        const { data: appRow, error: appErr } = await supabase
+          .from('loan_applications')
+          .insert({
+            user_id: userId,
+            status: 'PENDING',
+            purpose: 'Personal Loan',
+          })
+          .select('id')
+          .single();
+        if (appErr || !appRow?.id) throw appErr ?? new Error('No row returned');
+        applicationId = appRow.id;
+        console.log('[ID_UPLOAD_OCR] Created loan_application:', applicationId);
+      } catch (dbErr: any) {
+        // Auth / RLS not configured yet — fall back to mock
+        console.warn('[ID_UPLOAD_OCR] Could not create loan_applications row:', dbErr.message);
+        applicationId = `mock-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      }
 
-  const runIDUploadOCR = useCallback(
-    async (
-      file: File,
-      docType: 'AADHAAR' | 'PAN',
-      userId: string
-    ): Promise<string | null> => {
-      setIsRunning(true);
-      const supabase = createClient();
-
-      // FACE_EXTRACT happens inside edge function, we track it here
-      // Fallback: if Supabase storage/RLS blocks the upload (e.g. unauthenticated),
-      // generate a local application_id so pipeline steps 3-14 can still run.
       const uploadResult = await runStep('ID_UPLOAD_OCR', async () => {
-        const fileName = `${Date.now()}-${file.name}`;
+        const fileName = `${userId}/${applicationId}/${Date.now()}-${file.name}`;
 
         // Try real upload; on RLS/auth failure use mock path
-        let imagePath = fileName;
+        let imagePath = '';
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('temp-kyc')
           .upload(fileName, file);
         if (uploadError) {
-          // RLS or bucket policy block — log and continue with local mock
           console.warn('[ID_UPLOAD_OCR] Storage upload blocked (RLS/auth), using mock path:', uploadError.message);
         } else {
           imagePath = uploadData.path;
+          // Store doc metadata on the loan_applications row so admin can read it
+          await supabase.from('loan_applications').update({
+            id_type: docType,
+            updated_at: new Date().toISOString(),
+          }).eq('id', applicationId);
         }
 
-        // Try edge function; on failure generate a local application_id
+        // Try edge function; on failure record mock OCR result
         try {
           const { data: kycResult, error: kycError } = await supabase.functions.invoke(
             'process-id-kyc',
-            { body: { image_url: imagePath, user_id: userId, doc_type: docType } }
+            { body: { image_url: imagePath, user_id: userId, doc_type: docType, application_id: applicationId } }
           );
           if (kycError) throw kycError;
           if (!kycResult?.application_id) throw new Error('No application_id returned');
-          return kycResult;
+          return { ...kycResult, application_id: applicationId, image_path: imagePath };
         } catch (fnErr: any) {
-          console.warn('[ID_UPLOAD_OCR] Edge function failed, using mock application_id:', fnErr.message);
-          // Return a mock result so the pipeline continues through all steps
+          console.warn('[ID_UPLOAD_OCR] Edge function failed, using local OCR result:', fnErr.message);
           return {
-            application_id: `mock-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            application_id: applicationId,
             doc_type: docType,
+            image_path: imagePath,
             age_mismatch: false,
             mock: true,
           };
@@ -343,7 +351,6 @@ export function useKYCPipeline() {
         return null;
       }
 
-      const applicationId: string = uploadResult.data.application_id;
 
       // FACE_EXTRACT — extracted by edge function; record step
       await runStep('FACE_EXTRACT', async () => {

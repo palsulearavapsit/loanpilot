@@ -406,7 +406,24 @@ export default function OnboardingPage() {
                         ₹{Math.round((customAmount * (1 + (0.12 * customTenure / 12))) / customTenure).toLocaleString()}
                       </span>
                     </div>
-                    <button onClick={() => router.push('/admin')} className="px-5 py-2.5 rounded-xl gradient-gold font-bold text-xs uppercase tracking-widest text-brand-black gold-glow">
+                    <button onClick={() => {
+                        const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
+                        const entry = {
+                          id: applicationId || `local-${Date.now()}`,
+                          status: pipeline.output.final_decision || decisionData?.status || 'UNDER_REVIEW',
+                          risk_score: decisionData?.score ?? riskScore,
+                          amount: customAmount,
+                          tenure: customTenure,
+                          purpose: 'Personal Loan',
+                          created_at: new Date().toISOString(),
+                          profiles: { full_name: 'Applicant', email: '' },
+                          source: 'local_pipeline',
+                        };
+                        if (!existing.find((e: any) => e.id === entry.id)) {
+                          localStorage.setItem('kyc_completed_applications', JSON.stringify([entry, ...existing]));
+                        }
+                        router.push('/admin');
+                      }} className="px-5 py-2.5 rounded-xl gradient-gold font-bold text-xs uppercase tracking-widest text-brand-black gold-glow">
                       Apply Now
                     </button>
                   </div>
@@ -424,7 +441,24 @@ export default function OnboardingPage() {
                 </button>
               </div>
 
-              <button onClick={() => router.push('/admin')} className="px-8 py-3.5 rounded-2xl gradient-gold font-bold text-brand-black flex items-center gap-2 mx-auto shadow-gold hover:shadow-gold-lg transition-all gold-glow text-sm">
+              <button onClick={() => {
+                  const existing = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
+                  const entry = {
+                    id: applicationId || `local-${Date.now()}`,
+                    status: pipeline.output.final_decision || decisionData?.status || 'UNDER_REVIEW',
+                    risk_score: decisionData?.score ?? riskScore,
+                    amount: customAmount,
+                    tenure: customTenure,
+                    purpose: 'Personal Loan',
+                    created_at: new Date().toISOString(),
+                    profiles: { full_name: 'Applicant', email: '' },
+                    source: 'local_pipeline',
+                  };
+                  if (!existing.find((e: any) => e.id === entry.id)) {
+                    localStorage.setItem('kyc_completed_applications', JSON.stringify([entry, ...existing]));
+                  }
+                  router.push('/admin');
+                }} className="px-8 py-3.5 rounded-2xl gradient-gold font-bold text-brand-black flex items-center gap-2 mx-auto shadow-gold hover:shadow-gold-lg transition-all gold-glow text-sm">
                 View Dashboard <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>

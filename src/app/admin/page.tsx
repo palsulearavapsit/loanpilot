@@ -38,6 +38,7 @@ export default function AdminDashboard() {
 
   const [selectedAppLogs, setSelectedAppLogs] = useState<any[]>([]);
   const [selectedAppTranscript, setSelectedAppTranscript] = useState<any[]>([]);
+  const [selectedAppDocUrl, setSelectedAppDocUrl] = useState<string | null>(null);
 
   const fetchApps = async () => {
     setIsLoading(true);
@@ -46,17 +47,32 @@ export default function AdminDashboard() {
       .from('loan_applications')
       .select('*, profiles(full_name, email)')
       .order('created_at', { ascending: false });
-    
-    if (!error && data) {
-      setApplications(data);
-      calculateStats(data);
-    }
+
+    // Merge Supabase rows with any locally-completed pipelines
+    // (these are stored in localStorage when the user clicks "Apply Now" / "View Dashboard")
+    const localRaw = typeof window !== 'undefined'
+      ? localStorage.getItem('kyc_completed_applications')
+      : null;
+    const localApps: any[] = localRaw ? JSON.parse(localRaw) : [];
+
+    const supabaseApps: any[] = (!error && data) ? data : [];
+
+    // Deduplicate: prefer Supabase row over local copy if the ID matches
+    const supabaseIds = new Set(supabaseApps.map((a) => a.id));
+    const merged = [
+      ...supabaseApps,
+      ...localApps.filter((a) => !supabaseIds.has(a.id)),
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    setApplications(merged);
+    calculateStats(merged);
     setIsLoading(false);
   };
 
-  const fetchAppDetails = async (appId: string) => {
+  const fetchAppDetails = async (appId: string, app?: any) => {
     const supabase = createClient();
-    
+    setSelectedAppDocUrl(null);
+
     const [logsRes, transcriptRes] = await Promise.all([
       supabase.from('verification_logs').select('*').eq('application_id', appId).order('created_at', { ascending: true }),
       supabase.from('interview_transcripts').select('*').eq('application_id', appId).order('created_at', { ascending: true })
@@ -64,10 +80,21 @@ export default function AdminDashboard() {
 
     if (!logsRes.error) setSelectedAppLogs(logsRes.data || []);
     if (!transcriptRes.error) setSelectedAppTranscript(transcriptRes.data || []);
+
+    // Fetch signed URL for the uploaded ID document image
+    if (app?.image_path) {
+      const { data: signedData } = await supabase.storage
+        .from('temp-kyc')
+        .createSignedUrl(app.image_path, 300); // 5 min expiry
+      if (signedData?.signedUrl) setSelectedAppDocUrl(signedData.signedUrl);
+    }
   };
 
   useEffect(() => {
     fetchApps();
+    // Auto-refresh every 15s so new applications from onboarding appear
+    const interval = setInterval(fetchApps, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -106,7 +133,7 @@ export default function AdminDashboard() {
   const handleReview = (app: any) => {
     setSelectedApp(app);
     setIsReviewing(true);
-    fetchAppDetails(app.id);
+    fetchAppDetails(app.id, app);
   };
 
   const exportPDF = async (appId: string) => {
@@ -137,6 +164,18 @@ export default function AdminDashboard() {
   };
 
   const updateStatus = async (id: string, status: string) => {
+    // Guard: mock IDs are not valid UUIDs — skip DB update, just update local state
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isValidUUID) {
+      // Update the localStorage entry instead
+      const stored = JSON.parse(localStorage.getItem('kyc_completed_applications') || '[]');
+      const updated = stored.map((a: any) => a.id === id ? { ...a, status } : a);
+      localStorage.setItem('kyc_completed_applications', JSON.stringify(updated));
+      setIsReviewing(false);
+      fetchApps();
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase
       .from('loan_applications')
@@ -260,7 +299,12 @@ export default function AdminDashboard() {
                             {app.profiles?.full_name?.[0] || 'A'}
                           </div>
                           <div>
-                            <div className="font-bold text-brand-black">{app.profiles?.full_name || 'Anonymous'}</div>
+                            <div className="font-bold text-brand-black flex items-center gap-2">
+                              {app.profiles?.full_name || 'Anonymous'}
+                              {app.source === 'local_pipeline' && (
+                                <span className="text-[9px] bg-amber-500/15 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Local</span>
+                              )}
+                            </div>
                             <div className="text-[10px] text-muted-foreground font-mono truncate w-24">{app.id}</div>
                           </div>
                         </div>
@@ -342,10 +386,22 @@ export default function AdminDashboard() {
                   <DetailBox 
                     icon={<AlertTriangle className={selectedApp.risk_score > 50 ? 'text-red-500' : 'text-gold-dark'} />} 
                     label="Risk Classification" 
-                    value={`${selectedApp.risk_score}% Severity`} 
+                    value={`${selectedApp.risk_score || 0}% Severity`} 
                     subValue={selectedApp.risk_score > 70 ? 'Manual Intervention Mandatory' : 'System Recommendation: Low Risk'} 
                   />
+                  <DetailBox icon={<FileText />} label="Document Type" value={selectedApp.id_type || 'Not recorded'} subValue={selectedApp.id_number_last4 ? `Last 4: ${selectedApp.id_number_last4}` : undefined} />
+                  {selectedApp.tenure && <DetailBox icon={<Clock />} label="Tenure" value={`${selectedApp.tenure} Months`} />}
                 </div>
+
+                {/* Document Image */}
+                {selectedAppDocUrl && (
+                  <div className="bg-card/40 border-2 border-gold/20 p-6 rounded-[2rem]">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-gold-dark mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4" /> Submitted ID Document
+                    </h3>
+                    <img src={selectedAppDocUrl} alt="ID Document" className="max-h-64 rounded-2xl border border-gold-dark/10 object-contain w-full bg-muted" />
+                  </div>
+                )}
 
                 {/* AI Rationale */}
                 <div className="bg-card/40 border-2 border-gold/20 p-8 rounded-[3rem] shadow-sm">
